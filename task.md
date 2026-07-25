@@ -1,0 +1,48 @@
+# Implementation Task List (Allies Tab & Visual Spells)
+
+- `[x]` Generative Sprite Assets
+  - `[x]` Generate `sprite_boy.jpg`
+  - `[x]` Generate `sprite_girl.jpg`
+  - `[x]` Generate `sprite_cyber.jpg`
+  - `[x]` Generate `sprite_celestial.jpg`
+- `[x]` Generative Minion Sprite Assets
+  - `[x]` Generate `minion_math_wraith.jpg`
+  - `[x]` Generate `minion_math_imp.jpg`
+  - `[x]` Generate `minion_bio_slime.jpg`
+  - `[x]` Generate `minion_bio_spore.jpg`
+  - `[x]` Generate `minion_chem_pixie.jpg`
+  - `[x]` Create sludge/imp/basilisk copies from subject assets
+- `[x]` DOM Template Refactors
+  - `[x]` Insert `#enemy-sprite-img` element inside the enemy block in `index.html`
+  - `[x]` Insert `#cinematic-enemy-sprite` inside the cinematic modal in `index.html`
+  - `[x]` Add `🐾 Allies` nav button and `#screen-allies` section in `index.html`
+  - `[x]` Swap setup card text descriptions for Hydromancer/Geomancer in `index.html`
+  - `[x]` Add `#boss-intro-modal` overlay container in `index.html`
+- `[x]` Sprite Rendering & Cinematic Logic
+  - `[x]` Map encountered names to custom asset files dynamically inside `initBattle` in `src/battle.js`
+  - `[x]` Show player & enemy sprites inside `executePlayerAttack` and hide them on cinematic finish in `src/battle.js`
+  - `[x]` Swap preloaded Math and Bio minion sprites in `src/main.js` to match elements
+- `[x]` Dynamic Element Particle Colors & Deck Refactor
+  - `[x]` Unlock spells of all four elements simultaneously in `renderSpellDeck` in `src/battle.js`
+  - `[x]` Tune lightning particles color to yellow/purple inside `runCinematicSpellAnimation` in `src/battle.js`
+  - `[x]` Theme ambient fogs, grid lines, silhouettes, and card box-shadows dynamically to fit the cast spell's element inside `src/battle.js`
+  - `[x]` Refactor combat elemental buffs to trigger based on `activeSpell.element` instead of `player.element` in `src/battle.js`
+- `[x]` Spell-Based Question Topics
+  - `[x]` Map selected spell element to question subject (fire->chem, water->math, earth->bio, air->phys) in `castSpell` in `src/battle.js`
+- `[x]` Grade 6 Ontario School Curriculum Alignment
+  - `[x]` Restructure `rescueQuestions` and `bossQuestions` to contain grade-specific database keys in `src/questions.js`
+  - `[x]` Write curriculum-appropriate Grade 6 datasets for Math, Bio, Chem, and Phys in `src/questions.js`
+  - `[x]` Update `getQuestion` to extract rescue and boss questions dynamically using player's mapped grade level in `src/questions.js`
+  - `[x]` Swap post-battle Geomancer victory XP buff to biology questions in `src/battle.js`
+- `[x]` Higgsfield Seedance Mini 2.0 Boss Intros
+  - `[x]` Design `triggerBossIntro` in `src/higgsfield.js` with parallax zoom, flow vectors, and neural rendering logs
+  - `[x]` Bind `triggerBossIntro` call on boss collision in `src/main.js`
+- `[x]` 3-Minion Spawning Configuration
+  - `[x]` Add third minion to all four quadrants in `src/main.js`
+  - `[x]` Implement minion array length verification in `initAdventureMinions` in `src/main.js`
+- `[x]` Allies Management Tab
+  - `[x]` Route allies HUD click event and implement `renderAlliesList()` in `src/main.js`
+- `[x]` Post-Battle Refills
+  - `[x]` Refill `player.hp` and `player.mp` to maximum on battle victory inside `src/battle.js`
+- `[x]` Verification
+  - `[x]` Verify on local HTTP port and update `walkthrough.md`

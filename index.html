@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Knowledge Quest: Chronicles of Higgsfield - An educational STEM RPG for grades 4-10 powered by Higgsfield AI concepts.">
+  <title>Knowledge Quest: Chronicles of Higgsfield</title>
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css?v=65">
+  <!-- Global JS Error Boundary for Easy Debugging -->
+  <script>
+    (function() {
+      function displayError(title, message, stack) {
+        const div = document.createElement('div');
+        div.style.position = 'fixed';
+        div.style.top = '0';
+        div.style.left = '0';
+        div.style.width = '100%';
+        div.style.background = '#dc2626';
+        div.style.color = '#ffffff';
+        div.style.padding = '20px';
+        div.style.zIndex = '999999';
+        div.style.fontFamily = 'monospace';
+        div.style.fontSize = '13px';
+        div.style.lineHeight = '1.5';
+        div.style.whiteSpace = 'pre-wrap';
+        div.style.boxShadow = '0 6px 20px rgba(0,0,0,0.6)';
+        div.style.borderBottom = '4px solid #991b1b';
+        div.innerHTML = '<div style="font-weight:bold; font-size:16px; margin-bottom:8px;">⚠️ ' + title + '</div>' +
+                        '<strong>Message:</strong> ' + message + '<br>' +
+                        (stack ? '<br><strong>Stack Trace:</strong><br>' + stack : '');
+        document.body.appendChild(div);
+      }
+      window.onerror = function(message, source, lineno, colno, error) {
+        const msg = message + ' (at ' + source + ':' + lineno + ':' + colno + ')';
+        const stack = error && error.stack ? error.stack : '';
+        displayError('Uncaught Runtime Javascript Exception', msg, stack);
+        return false;
+      };
+      window.addEventListener('unhandledrejection', function(event) {
+        const reason = event.reason || {};
+        const msg = reason.message || reason || 'Unknown Promise Rejection';
+        const stack = reason.stack || '';
+        displayError('Unhandled Promise Rejection', msg, stack);
+      });
+    })();
+  </script>
+</head>
+<body>
+
+  <!-- Game HUD (Visible after Character Select) -->
+  <header id="game-hud" class="hud hidden">
+    <div class="hud-left">
+      <div class="hud-profile">
+        <img id="hud-avatar" src="assets/wizard_avatar.jpg" alt="Avatar" class="avatar-small">
+        <div class="hud-name-container">
+          <div id="hud-username" class="hud-name">Wizard</div>
+          <div class="hud-level-badge">Lv. <span id="hud-level">1</span></div>
+        </div>
+      </div>
+      <div class="hud-xp-container">
+        <div class="xp-bar-outer">
+          <div id="hud-xp-bar" class="xp-bar-inner" style="width: 0%"></div>
+        </div>
+        <span class="xp-text"><span id="hud-xp-current">0</span>/<span id="hud-xp-next">100</span> XP</span>
+      </div>
+    </div>
+    
+    <div class="hud-center">
+      <nav class="hud-nav">
+        <button id="nav-map" class="nav-btn active">🗺️ Adventure Map</button>
+        <button id="nav-shop" class="nav-btn">🛒 Realm Shop</button>
+        <button id="nav-lab" class="nav-btn">🪄 Magic Training</button>
+        <button id="nav-dashboard" class="nav-btn">📊 Inventory & Stats</button>
+        <button id="nav-allies" class="nav-btn">🐾 Allies</button>
+      </nav>
+    </div>
+
+    <div class="hud-right">
+      <div class="hud-stat-pill gold">
+        <span>🪙</span> <span id="hud-gold">0</span>
+      </div>
+      <div class="hud-stat-pill grade">
+        <span>🎓</span>
+        <select id="hud-grade-select" class="grade-dropdown">
+          <option value="4">Grade 4</option>
+          <option value="5">Grade 5</option>
+          <option value="6">Grade 6</option>
+          <option value="7">Grade 7</option>
+          <option value="8">Grade 8</option>
+          <option value="9">Grade 9</option>
+          <option value="10">Grade 10</option>
+        </select>
+      </div>
+      <button id="respawn-btn" class="hud-stat-pill" style="cursor: pointer; background: rgba(239, 68, 68, 0.2); border: 1px solid rgba(239, 68, 68, 0.5); color: #f8fafc; font-weight: 700; gap: 4px; padding: 4px 10px;" title="Unstuck / Safe Respawn to Hub">📍 Respawn</button>
+      <button id="reset-game-btn" class="icon-btn" title="Reset Game & New Journey">🔄</button>
+      <button id="sound-toggle-btn" class="icon-btn" title="Toggle Sound">🔊</button>
+    </div>
+  </header>
+
+  <!-- Screen Wrapper -->
+  <main id="screen-container">
+
+    <!-- SCREEN 1: Setup & Character Customization -->
+    <section id="screen-auth" class="screen active">
+      <div class="auth-card glass">
+        <div class="auth-header">
+          <h1 class="logo-text">KNOWLEDGE QUEST</h1>
+          <p class="subtitle-text">Chronicles of Higgsfield</p>
+        </div>
+
+        <form id="setup-form" class="setup-form">
+          <div class="form-group">
+            <label for="char-name">Wizard Name</label>
+            <input type="text" id="char-name" placeholder="Enter your Wizard name..." required maxlength="15" autocomplete="off">
+          </div>
+
+          <div class="form-group row">
+            <div>
+              <label>Select Wizard Portrait</label>
+              <div class="avatar-select-grid" id="setup-avatar-grid">
+                <button type="button" class="avatar-option-btn active" data-avatar="boy">🧑‍🎤 Boy</button>
+                <button type="button" class="avatar-option-btn" data-avatar="girl">🧝‍♀️ Girl</button>
+                <button type="button" class="avatar-option-btn" data-avatar="cyber">🧑‍💻 Cyber</button>
+                <button type="button" class="avatar-option-btn" data-avatar="celestial">🧙‍♂️ Cosmic</button>
+              </div>
+            </div>
+            <div>
+              <label for="setup-robe-hue">Robe Color: <span id="setup-hue-val">0°</span></label>
+              <input type="range" id="setup-robe-hue" min="0" max="360" value="0" class="hue-slider">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Select Specialty & STEM Subject Buff</label>
+            <div class="element-grid">
+              <label class="element-card fire">
+                <input type="radio" name="element" value="fire" checked>
+                <div class="card-inner">
+                  <span class="element-icon">🔥</span>
+                  <span class="element-name">Pyromancer</span>
+                  <span class="element-desc"><strong>Chemistry Buff:</strong> +25% Spell Damage & +30% Gold on Chemistry questions.</span>
+                </div>
+              </label>
+               <label class="element-card water">
+                <input type="radio" name="element" value="water">
+                <div class="card-inner">
+                  <span class="element-icon">💧</span>
+                  <span class="element-name">Hydromancer</span>
+                  <span class="element-desc"><strong>Math Buff:</strong> Answering Mathematics questions heals you for 10% of Max HP.</span>
+                </div>
+              </label>
+              <label class="element-card earth">
+                <input type="radio" name="element" value="earth">
+                <div class="card-inner">
+                  <span class="element-icon">🌿</span>
+                  <span class="element-name">Geomancer</span>
+                  <span class="element-desc"><strong>Biology Buff:</strong> Answering Biology questions awards +40% extra XP.</span>
+                </div>
+              </label>
+              <label class="element-card air">
+                <input type="radio" name="element" value="air">
+                <div class="card-inner">
+                  <span class="element-icon">⚡</span>
+                  <span class="element-name">Aeromancer</span>
+                  <span class="element-desc"><strong>Physics Buff:</strong> 25% chance to land a critical double-damage hit.</span>
+                </div>
+              </label>
+            </div>
+          </div>
+
+          <div class="form-group row">
+            <div>
+              <label for="setup-grade">Grade Level</label>
+              <select id="setup-grade" class="setup-dropdown">
+                <option value="4">Grade 4</option>
+                <option value="5">Grade 5</option>
+                <option value="6">Grade 6</option>
+                <option value="7">Grade 7</option>
+                <option value="8" selected>Grade 8</option>
+                <option value="9">Grade 9</option>
+                <option value="10">Grade 10</option>
+              </select>
+            </div>
+            <div>
+              <label for="setup-subject">Starting Subject</label>
+              <select id="setup-subject" class="setup-dropdown">
+                <option value="math" selected>Mathematics</option>
+                <option value="bio">Biology</option>
+                <option value="chem">Chemistry</option>
+                <option value="phys">Physics</option>
+              </select>
+            </div>
+          </div>
+
+          <button type="submit" class="cta-btn primary">Begin Adventure</button>
+        </form>
+      </div>
+    </section>
+
+    <!-- SCREEN 2: Adventure Map -->
+    <section id="screen-map" class="screen hidden" style="padding: 10px;">
+      <div class="map-container">
+        <div class="map-header" style="margin-bottom: 6px;">
+          <h2 class="map-title text-glow">Higgsfield Open World Adventure</h2>
+          <p class="map-progress-tracker">Explore the map. Defeat 3 minions in any realm to summon the **Realm Boss** in the center of that realm!</p>
+        </div>
+        
+        <div class="map-world" style="position: relative;">
+          <!-- 2D Canvas Map expanded for larger screen viewing -->
+          <canvas id="adventure-canvas" width="1150" height="560" style="max-height: calc(100vh - 140px); width: 100%; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);"></canvas>
+
+          <!-- On-screen Virtual D-Pad Overlay -->
+          <div class="dpad-overlay">
+            <button id="dpad-up" class="dpad-btn up">▲</button>
+            <div class="dpad-row">
+              <button id="dpad-left" class="dpad-btn left">◀</button>
+              <button id="dpad-right" class="dpad-btn right">▶</button>
+            </div>
+            <button id="dpad-down" class="dpad-btn down">▼</button>
+          </div>
+
+          <!-- Controls HUD Info overlay -->
+          <div class="map-controls-legend">
+            <span>🎮 WASD / Arrows / D-pad to move</span>
+          </div>
+        </div>
+
+        <div class="map-footer glass" style="padding: 6px 12px; margin-top: 6px; width: 100%; max-width: 900px; display: flex; justify-content: space-between; font-size: 0.8rem;">
+          <div>🔢 Math: <span id="math-minions">0</span>/3 | Cleared: <span id="math-status-lbl">No</span></div>
+          <div>🌱 Biology: <span id="bio-minions">0</span>/3 | Cleared: <span id="bio-status-lbl">No</span></div>
+          <div>🧪 Chem: <span id="chem-minions">0</span>/3 | Cleared: <span id="chem-status-lbl">No</span></div>
+          <div>⚡ Physics: <span id="phys-minions">0</span>/3 | Cleared: <span id="phys-status-lbl">No</span></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREEN 3: Turn-Based Battle Arena -->
+    <section id="screen-battle" class="screen hidden">
+      <div class="battle-layout" style="background-image: url('assets/battle_arena_bg.jpg')">
+        <!-- Battle Overlay Overlay -->
+        <div class="battle-overlay-dim"></div>
+
+        <!-- Battle Top Header -->
+        <div class="battle-header-info glass">
+          <div id="battle-subject-indicator">Subject: Mathematics</div>
+          <div id="battle-type-banner" class="battle-banner-type minion">Minion Battle</div>
+          <div id="battle-announcer">A wild Quantum Golem stands in your path!</div>
+        </div>
+
+        <!-- The Combat Arena (Visual) -->
+        <div class="battle-arena">
+          <!-- Player Wizard & Equipped Pet -->
+          <div id="combatant-player" class="combatant">
+            <div class="status-panel glass" style="display: flex; align-items: center; gap: 10px;">
+              <img id="battle-player-avatar-thumb" src="assets/profile_boy.jpg" alt="Player Avatar" style="width: 44px; height: 44px; border-radius: 50%; border: 2px solid #a855f7; object-fit: cover; box-shadow: 0 4px 12px rgba(0,0,0,0.5); flex-shrink: 0;">
+              <div style="flex: 1;">
+                <div class="combatant-name" id="player-battle-name">Wizard</div>
+                <div class="bar-stat hp">
+                  <span class="bar-label">HP</span>
+                  <div class="bar-outer"><div id="player-hp-bar" class="bar-inner hp" style="width: 100%"></div></div>
+                  <span class="bar-val" id="player-hp-text">100/100</span>
+                </div>
+                <div class="bar-stat mp">
+                  <span class="bar-label">MP</span>
+                  <div class="bar-outer"><div id="player-mp-bar" class="bar-inner mp" style="width: 100%"></div></div>
+                  <span class="bar-val" id="player-mp-text">50/50</span>
+                </div>
+              </div>
+            </div>
+            <div class="sprite-container">
+              <img id="player-sprite" src="assets/wizard_avatar.jpg" alt="Player Avatar" class="sprite-img">
+              <div id="player-staff-overlay" class="player-staff-layer hidden">🪄</div>
+              <div id="player-cast-glow" class="cast-glow"></div>
+            </div>
+            
+            <!-- Battle Pet Helper Sprite -->
+            <div id="battle-pet-container" class="battle-pet-frame hidden" style="display: flex; align-items: center; gap: 6px;">
+              <img id="battle-pet-img" src="assets/minion_bio.jpg" alt="Pet Helper" style="width: 32px; height: 32px; border-radius: 50%; border: 1.5px solid #4ade80; object-fit: cover;">
+              <span class="pet-icon-bubble" id="battle-pet-emoji">🐾</span>
+              <span class="pet-name-lbl" id="battle-pet-name">Pet helper</span>
+            </div>
+          </div>
+
+          <!-- Battle FX Canvas overlay for spell animations -->
+          <canvas id="battle-fx-canvas" class="battle-fx-layer"></canvas>
+
+          <!-- Enemy Monster -->
+          <div id="combatant-enemy" class="combatant">
+            <div class="status-panel glass">
+              <div class="combatant-name" id="enemy-battle-name">Monster</div>
+              <div class="bar-stat hp">
+                <span class="bar-label">HP</span>
+                <div class="bar-outer"><div id="enemy-hp-bar" class="bar-inner hp" style="width: 100%"></div></div>
+                <span class="bar-val" id="enemy-hp-text">120/120</span>
+              </div>
+              <div class="bar-stat level">
+                <span class="bar-badge" id="enemy-level-text">Lv. 3</span>
+              </div>
+            </div>
+            <div class="sprite-container">
+              <!-- Inline Monster SVG (hidden fallback) -->
+              <svg id="enemy-svg" viewBox="0 0 100 100" class="sprite-img-svg hidden">
+                <!-- Fallback or dynamic shape will be drawn by battle.js -->
+              </svg>
+              <!-- High-quality enemy sprite image -->
+              <img id="enemy-sprite-img" class="sprite-img-svg" src="" alt="Enemy Sprite" style="object-fit: cover; border-radius: var(--radius-md); box-shadow: 0 4px 15px rgba(0,0,0,0.5); border: 2.5px solid rgba(255,255,255,0.15);">
+              <div id="enemy-cast-glow" class="cast-glow"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Cinematic Video Card (Triggered on correct answers to simulate Higgsfield AI video spells) -->
+        <div id="cinematic-video-modal" class="cinematic-container hidden">
+          <div class="cinematic-card glass">
+            <div class="cinematic-watermark">Higgsfield AI Cinematic Spell Render (24fps WebM)</div>
+            <div class="cinematic-screen">
+              <canvas id="cinematic-canvas"></canvas>
+              <img id="cinematic-player-sprite" class="cinematic-sprite-popup" src="" alt="Casting Sprite">
+              <img id="cinematic-enemy-sprite" class="cinematic-enemy-sprite-popup" src="" alt="Target Sprite">
+              <div class="cinematic-prompt-overlay">
+                Prompt: <span id="cinematic-prompt-text">"Fire spell..."</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Battle Controls Panel (Glassmorphic) -->
+        <div class="battle-control-panel glass">
+          <!-- Action Choice Bar (Spells, Items, Captures) -->
+          <div class="battle-choice-row" id="battle-action-bar">
+            <button id="action-select-spell" class="cta-btn primary small">⚔️ Cast Magic</button>
+            <button id="action-use-item-menu" class="cta-btn secondary small">🧪 Use Potions</button>
+            <button id="action-capture-pet" class="cta-btn secondary small hidden">💫 Attempt Capture</button>
+          </div>
+
+          <!-- Spell Deck (Initial State) -->
+          <div id="battle-deck" class="spell-deck hidden">
+            <h3 class="panel-section-title">Select a spell to cast (Requires answering a STEM question):</h3>
+            <div class="spell-grid" id="spells-container">
+              <!-- Spells generated dynamically based on element/custom spell from lab -->
+            </div>
+            <button class="cta-btn secondary small back-action-btn">🔙 Back</button>
+          </div>
+
+          <!-- Items Deck -->
+          <div id="battle-items" class="spell-deck hidden">
+            <h3 class="panel-section-title">Use a potion from your inventory (Instant action - Does not end turn):</h3>
+            <div class="spell-grid">
+              <button id="battle-use-hp" class="spell-btn water">
+                <span class="spell-icon-sm">❤️</span>
+                <span class="spell-name-sm">HP Potion</span>
+                <span class="spell-cost-sm" id="battle-hp-count">x0 left</span>
+              </button>
+              <button id="battle-use-mp" class="spell-btn water">
+                <span class="spell-icon-sm">💧</span>
+                <span class="spell-name-sm">Mana Elixir</span>
+                <span class="spell-cost-sm" id="battle-mp-count">x0 left</span>
+              </button>
+            </div>
+            <button class="cta-btn secondary small back-action-btn" style="margin-top: 10px;">🔙 Back</button>
+          </div>
+
+          <!-- Question Card (Visible during spell casting or captures) -->
+          <div id="question-card" class="question-card hidden">
+            <div class="question-header">
+              <span id="question-subject-badge" class="subject-badge">Mathematics</span>
+              <span class="timer-badge">⏳ Time: <span id="question-timer">--</span>s</span>
+            </div>
+            <div class="question-graphic-container" style="width: 100%; display: flex; justify-content: center; margin: 8px 0;">
+              <img id="question-graphic" src="" alt="Question Diagram" style="width: 100%; max-width: 480px; height: 180px; object-fit: cover; border-radius: var(--radius-md); border: 1px solid rgba(255,255,255,0.15); box-shadow: 0 4px 15px rgba(0,0,0,0.5);">
+            </div>
+            <div id="question-text" class="question-body-text">
+              What is the value of x in the equation: 2x + 5 = 15?
+            </div>
+            <div id="answers-grid" class="answers-grid">
+              <!-- Choices rendered here -->
+            </div>
+          </div>
+
+          <!-- Answer Explanation Panel (Visible after answering incorrectly/correctly) -->
+          <div id="explanation-panel" class="explanation-panel hidden">
+            <div class="explanation-status" id="explanation-status-text">Correct!</div>
+            <p id="explanation-body-text">Explanation goes here.</p>
+            <button id="explanation-next-btn" class="cta-btn primary small">Continue Battle</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREEN 4: Magic STEM Training Academy -->
+    <section id="screen-lab" class="screen hidden">
+      <div style="max-width: 1000px; margin: 0 auto; padding: 15px;">
+        <div style="text-align: center; margin-bottom: 20px;">
+          <h2 style="font-size: 2.1rem; background: linear-gradient(135deg, #a855f7, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 800; margin: 0 0 6px;">
+            🪄 Archmage STEM Magic Academy
+          </h2>
+          <p style="color: var(--text-secondary); font-size: 0.95rem; max-width: 650px; margin: 0 auto; line-height: 1.5;">
+            Master step-by-step solutions, key rules, and worked examples for all 4 elemental STEM subjects to dominate combat!
+          </p>
+        </div>
+
+        <!-- Subject Selection Tabs -->
+        <div id="training-subject-bar" style="display: flex; justify-content: center; gap: 10px; margin-bottom: 22px; flex-wrap: wrap;">
+          <button class="training-tab-btn active" data-subject="chem" style="padding: 10px 20px; border-radius: 30px; border: 1.5px solid #ef4444; background: rgba(239, 68, 68, 0.2); color: #f8fafc; font-weight: 700; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+            🔥 Chemistry (Fire Spells)
+          </button>
+          <button class="training-tab-btn" data-subject="math" style="padding: 10px 20px; border-radius: 30px; border: 1.5px solid rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.1); color: #94a3b8; font-weight: 700; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+            💧 Mathematics (Water Spells)
+          </button>
+          <button class="training-tab-btn" data-subject="bio" style="padding: 10px 20px; border-radius: 30px; border: 1.5px solid rgba(34, 197, 94, 0.4); background: rgba(34, 197, 94, 0.1); color: #94a3b8; font-weight: 700; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+            🌿 Biology (Earth Spells)
+          </button>
+          <button class="training-tab-btn" data-subject="phys" style="padding: 10px 20px; border-radius: 30px; border: 1.5px solid rgba(168, 85, 247, 0.4); background: rgba(168, 85, 247, 0.1); color: #94a3b8; font-weight: 700; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+            ⚡ Physics (Lightning Spells)
+          </button>
+        </div>
+
+        <!-- Dynamic Training Content Card -->
+        <div id="training-content-card" class="glass" style="border: 1px solid rgba(255,255,255,0.15); border-radius: var(--radius-lg); padding: 25px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px);">
+          <!-- Renders training guide dynamically -->
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREEN 5: Medieval Arcane Market Shop -->
+    <section id="screen-shop" class="screen hidden">
+      <div class="shop-layout-container medieval-market-container">
+        <!-- Medieval Merchant Banner Header -->
+        <div class="medieval-shop-header">
+          <div class="medieval-banner-sign">
+            <span class="shop-sign-icon">🎪</span>
+            <h2>Ye Olde Arcane Bazaar</h2>
+            <span class="shop-sign-icon">⚔️</span>
+          </div>
+          <div class="shopkeeper-dialogue-box">
+            <div class="shopkeeper-avatar">🧙‍♂️</div>
+            <div class="shopkeeper-text">
+              <span class="shopkeeper-title">Gideon the Arcane Merchant</span>
+              <p class="shopkeeper-quote">"Greetings traveler! Browse my finest enchanted wares, forged in dragon fire and woven in ancient starlight to aid thee in combat."</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="shop-shelves medieval-stalls-container">
+          <!-- Alchemist Stall -->
+          <div class="shop-shelf medieval-stall alchemist-stall">
+            <div class="stall-header">
+              <h3>🧪 The Alchemist's Elixir Stall</h3>
+              <span class="stall-subtitle">Brewed with rare magical botanicals & crystal dust</span>
+            </div>
+            <div class="shop-item-grid">
+              <div class="shop-item-card medieval-card">
+                <span class="item-icon">❤️</span>
+                <h4>HP Healing Potion</h4>
+                <p class="item-desc">Instantly restores 50 health during combat.</p>
+                <div class="item-cost-row">
+                  <span class="coin-icon">🪙 50 Gold</span>
+                  <button class="cta-btn primary small buy-item-btn medieval-buy-btn" data-item="potion_hp">Acquire</button>
+                </div>
+              </div>
+              
+              <div class="shop-item-card medieval-card">
+                <span class="item-icon">💧</span>
+                <h4>Mana Elixir</h4>
+                <p class="item-desc">Restores 25 Magic Points (MP) instantly.</p>
+                <div class="item-cost-row">
+                  <span class="coin-icon">🪙 40 Gold</span>
+                  <button class="cta-btn primary small buy-item-btn medieval-buy-btn" data-item="potion_mp">Acquire</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Blacksmith & Wandsmith Stall -->
+          <div class="shop-shelf medieval-stall blacksmith-stall">
+            <div class="stall-header">
+              <h3>🔨 The Blacksmith & Wandsmith's Forge</h3>
+              <span class="stall-subtitle">Crafted with enchanted oak, steel, and plasma crystals</span>
+            </div>
+            <div class="shop-item-grid">
+              <!-- Staffs -->
+              <div class="shop-item-card medieval-card">
+                <span class="item-icon">🪄</span>
+                <h4>Apprentice Wand</h4>
+                <p class="item-desc">Basic wooden wand. Adds <strong>+5 Spell Power</strong>.</p>
+                <div class="item-cost-row">
+                  <span class="coin-icon">🪙 100 Gold</span>
+                  <button class="cta-btn primary small buy-item-btn medieval-buy-btn" data-item="wand_apprentice">Acquire</button>
+                </div>
+              </div>
+
+              <div class="shop-item-card medieval-card">
+                <span class="item-icon">🔮</span>
+                <h4>Archmage Staff</h4>
+                <p class="item-desc">Glows with plasma. Adds <strong>+15 Spell Power</strong>.</p>
+                <div class="item-cost-row">
+                  <span class="coin-icon">🪙 250 Gold</span>
+                  <button class="cta-btn primary small buy-item-btn medieval-buy-btn" data-item="staff_archmage">Acquire</button>
+                </div>
+              </div>
+
+              <!-- Robes -->
+              <div class="shop-item-card medieval-card">
+                <span class="item-icon">🥋</span>
+                <h4>Aether Robes</h4>
+                <p class="item-desc">Shields against forces. Adds <strong>+30 Max HP</strong>.</p>
+                <div class="item-cost-row">
+                  <span class="coin-icon">🪙 180 Gold</span>
+                  <button class="cta-btn primary small buy-item-btn medieval-buy-btn" data-item="robe_aether">Acquire</button>
+                </div>
+              </div>
+
+              <!-- Rings -->
+              <div class="shop-item-card medieval-card">
+                <span class="item-icon">💍</span>
+                <h4>Quantum Ring</h4>
+                <p class="item-desc">Increases magical capacity. Adds <strong>+15 Max MP</strong>.</p>
+                <div class="item-cost-row">
+                  <span class="coin-icon">🪙 150 Gold</span>
+                  <button class="cta-btn primary small buy-item-btn medieval-buy-btn" data-item="ring_quantum">Acquire</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREEN 6: Student Stats & Inventory Dashboard -->
+    <section id="screen-dashboard" class="screen hidden">
+      <div class="dashboard-layout">
+        <!-- Top Stats Row -->
+        <div class="stats-row">
+          <div class="stat-box glass">
+            <span class="box-icon">👑</span>
+            <div class="box-info">
+              <h3>Overall Grade</h3>
+              <p class="big-stat" id="dash-grade-text">Grade 8</p>
+            </div>
+          </div>
+          <div class="stat-box glass">
+            <span class="box-icon">🔥</span>
+            <div class="box-info">
+              <h3>Current Streak</h3>
+              <p class="big-stat"><span id="dash-streak-text">0</span> Answers</p>
+            </div>
+          </div>
+          <div class="stat-box glass">
+            <span class="box-icon">🎯</span>
+            <div class="box-info">
+              <h3>Answer Accuracy</h3>
+              <p class="big-stat" id="dash-accuracy-text">0%</p>
+            </div>
+          </div>
+          <div class="stat-box glass">
+            <span class="box-icon">⚔️</span>
+            <div class="box-info">
+              <h3>Battles Won</h3>
+              <p class="big-stat"><span id="dash-battles-text">0</span> Victories</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Main Dashboard Split (Grid columns) -->
+        <div class="dashboard-split three-way">
+          
+          <!-- Column 1: circular mastery meters (STEM) -->
+          <div class="dash-panel glass">
+            <h2>🎯 Subject Mastery (STEM)</h2>
+            <div class="mastery-grid compact">
+              <!-- Math -->
+              <div class="mastery-card">
+                <div class="progress-ring-container small">
+                  <svg class="progress-ring" width="100" height="100">
+                    <circle class="ring-bg" stroke="#1e293b" stroke-width="6" fill="transparent" r="40" cx="50" cy="50"/>
+                    <circle id="ring-math" class="ring-progress math" stroke="#10b981" stroke-width="6" fill="transparent" r="40" cx="50" cy="50" stroke-dasharray="251.3" stroke-dashoffset="251.3"/>
+                  </svg>
+                  <div class="ring-label-val" id="val-math" style="font-size: 0.95rem;">0%</div>
+                </div>
+                <div class="subject-title">Math</div>
+              </div>
+
+              <!-- Biology -->
+              <div class="mastery-card">
+                <div class="progress-ring-container small">
+                  <svg class="progress-ring" width="100" height="100">
+                    <circle class="ring-bg" stroke="#1e293b" stroke-width="6" fill="transparent" r="40" cx="50" cy="50"/>
+                    <circle id="ring-bio" class="ring-progress bio" stroke="#3b82f6" stroke-width="6" fill="transparent" r="40" cx="50" cy="50" stroke-dasharray="251.3" stroke-dashoffset="251.3"/>
+                  </svg>
+                  <div class="ring-label-val" id="val-bio" style="font-size: 0.95rem;">0%</div>
+                </div>
+                <div class="subject-title">Biology</div>
+              </div>
+
+              <!-- Chemistry -->
+              <div class="mastery-card">
+                <div class="progress-ring-container small">
+                  <svg class="progress-ring" width="100" height="100">
+                    <circle class="ring-bg" stroke="#1e293b" stroke-width="6" fill="transparent" r="40" cx="50" cy="50"/>
+                    <circle id="ring-chem" class="ring-progress chem" stroke="#eab308" stroke-width="6" fill="transparent" r="40" cx="50" cy="50" stroke-dasharray="251.3" stroke-dashoffset="251.3"/>
+                  </svg>
+                  <div class="ring-label-val" id="val-chem" style="font-size: 0.95rem;">0%</div>
+                </div>
+                <div class="subject-title">Chem</div>
+              </div>
+
+              <!-- Physics -->
+              <div class="mastery-card">
+                <div class="progress-ring-container small">
+                  <svg class="progress-ring" width="100" height="100">
+                    <circle class="ring-bg" stroke="#1e293b" stroke-width="6" fill="transparent" r="40" cx="50" cy="50"/>
+                    <circle id="ring-phys" class="ring-progress phys" stroke="#ec4899" stroke-width="6" fill="transparent" r="40" cx="50" cy="50" stroke-dasharray="251.3" stroke-dashoffset="251.3"/>
+                  </svg>
+                  <div class="ring-label-val" id="val-phys" style="font-size: 0.95rem;">0%</div>
+                </div>
+                <div class="subject-title">Physics</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column 2: Inventory & Gear Equipping -->
+          <div class="dash-panel glass">
+            <h2>🎒 Inventory & Gear</h2>
+            <div class="inventory-slots-container">
+              <!-- Equipped Slots -->
+              <div class="equipped-gear-grid">
+                <div class="gear-slot" id="slot-staff" data-type="staff">
+                  <span class="slot-label">Weapon</span>
+                  <div class="slot-item-box" id="equipped-staff-box">🪄 None Equipped</div>
+                </div>
+                <div class="gear-slot" id="slot-robe" data-type="robe">
+                  <span class="slot-label">Robes</span>
+                  <div class="slot-item-box" id="equipped-robe-box">🥋 None Equipped</div>
+                </div>
+                <div class="gear-slot" id="slot-ring" data-type="ring">
+                  <span class="slot-label">Accessory</span>
+                  <div class="slot-item-box" id="equipped-ring-box">💍 None Equipped</div>
+                </div>
+              </div>
+
+              <!-- Consumables Shelf -->
+              <h3 class="panel-section-title" style="margin-top: 12px;">Potions & Elixirs:</h3>
+              <div class="consumables-shelf-grid" style="display: flex; gap: 8px; margin-bottom: 8px;">
+                <div class="consumable-stat-pill" style="flex: 1; padding: 6px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: var(--radius-sm); font-size: 0.75rem; text-align: center;">❤️ HP Potions: <strong id="dash-potion-hp-count" style="color: var(--color-hp);">x0</strong></div>
+                <div class="consumable-stat-pill" style="flex: 1; padding: 6px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05); border-radius: var(--radius-sm); font-size: 0.75rem; text-align: center;">💧 Mana Elixirs: <strong id="dash-potion-mp-count" style="color: var(--color-mp);">x0</strong></div>
+              </div>
+
+              <!-- Inventory Pouch Items -->
+              <h3 class="panel-section-title" style="margin-top: 12px;">Stored Equipment (Click to Equip):</h3>
+              <div class="inventory-bag-grid" id="inventory-bag-items">
+                <div class="empty-bag-text">Your equipment pouch is empty. Visit the Shop to purchase gear!</div>
+              </div>
+
+              <!-- Dashboard Customizer -->
+              <h3 class="panel-section-title" style="margin-top: 14px;">Customize Character:</h3>
+              <div class="dash-customizer-controls">
+                <div class="form-group">
+                  <div class="avatar-select-grid small" id="dash-avatar-grid">
+                    <button type="button" class="avatar-option-btn small active" data-avatar="boy">🧑‍🎤 Boy</button>
+                    <button type="button" class="avatar-option-btn small" data-avatar="girl">🧝‍♀️ Girl</button>
+                    <button type="button" class="avatar-option-btn small" data-avatar="cyber">🧑‍💻 Cyber</button>
+                    <button type="button" class="avatar-option-btn small" data-avatar="celestial">🧙‍♂️ Cosmic</button>
+                  </div>
+                </div>
+                <div class="form-group" style="margin-top: 6px;">
+                  <label for="dash-robe-hue">Robe Color: <span id="dash-hue-val">0°</span></label>
+                  <input type="range" id="dash-robe-hue" min="0" max="360" value="0" class="hue-slider">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column 3: Question Log history -->
+          <div class="dash-panel glass">
+            <h2>📜 Question History Log</h2>
+            <div class="history-log" id="dashboard-history-log" style="max-height: 280px;">
+              <div class="empty-log">No questions answered yet. Head over to the Adventure Map and fight some monsters!</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom Row: Pet Menagerie Gallery -->
+        <div class="dash-panel glass" style="min-height: 180px; margin-top: 10px;">
+          <h2>🐾 Pet Menagerie</h2>
+          <p class="panel-desc-small">Captured pets fight alongside you and deal passive auxiliary damage! Click a pet to set it active.</p>
+          <div class="pets-menagerie-grid" id="pets-menagerie-list">
+            <div class="empty-pets-text">No captured pets. Decrease wild monsters' health below 50% in battle to capture them!</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- SCREEN 11: Allies Menagerie Tab -->
+    <section id="screen-allies" class="screen hidden" style="padding: 24px;">
+      <div class="screen-header">
+        <h1 class="text-glow" style="font-size: 2.2rem; font-weight: 800; background: linear-gradient(135deg, #a855f7, #6366f1); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">🐾 Allied Companions</h1>
+        <p class="subtitle" style="color: var(--text-secondary); margin-top: 4px;">Click on a captured creature to set them as your active battle sidekick!</p>
+      </div>
+      
+      <div class="allies-wrapper glass" style="padding: 28px; border-radius: var(--radius-lg); margin-top: 24px; min-height: 300px;">
+        <div id="allies-grid-list" class="pets-menagerie-grid">
+          <div class="empty-pets-text">No captured pets. Decrease wild monsters' health below 50% in battle to capture them!</div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Narrative Story Intro Overlay Modal -->
+  <div id="story-modal" class="modal hidden">
+    <div class="modal-card glass level-up-glow" style="max-width: 500px; background-image: url('assets/story_intro.jpg'); background-size: cover; background-position: center; position: relative; overflow: hidden; border: 1px solid rgba(168, 85, 247, 0.45);">
+      <div style="position: absolute; top:0; left:0; width:100%; height:100%; background: rgba(2, 6, 23, 0.82); z-index: 1;"></div>
+      <div style="position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 16px; width: 100%;">
+        <div class="modal-icon">🌌</div>
+        <h2 class="level-up-title text-glow">RESCUE THE AETHER</h2>
+        <p style="font-size: 0.9rem; line-height: 1.4; color: #cbd5e1; text-align: left;">
+          Apprentice Wizard! The **Higgsfield Core** has collapsed, and its mathematical constants and physical equations are fragmenting. The four elemental realms are being corrupted by rogue mathematical entities.
+          <br><br>
+          1. **Explore the Realms**: Journey to the 4 domains and defeat the corrupted minions.
+          <br>
+          2. **Challenge the Bosses**: Defeat 3 minions in any realm to summon the Core Boss. Clearing a boss restores that realm's core law.
+          <br>
+          3. **Rescue Creatures**: Whittle wild creatures below 50% HP in battle to capture and recruit them.
+          <br><br>
+          Solve STEM challenges to cast your spells. May your equations guide your wand!
+        </p>
+        <button id="story-close-btn" class="cta-btn primary">Begin Quest</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCREEN 12: Higgsfield Boss Intro Cutscene Overlay -->
+  <div id="boss-intro-modal" class="modal hidden" style="z-index: 1200; background: rgba(2, 6, 23, 0.97);">
+    <div class="modal-card glass level-up-glow" style="max-width: 680px; padding: 0; text-align: center; border: 2.5px solid var(--primary); overflow: hidden; border-radius: var(--radius-lg);">
+      
+      <!-- Video Player (fills top of card) -->
+      <div style="position: relative; width: 100%; background: #000;">
+        <video id="boss-intro-video" autoplay muted playsinline
+          style="width: 100%; display: block; max-height: 380px; object-fit: cover;">
+          Your browser does not support HTML5 video.
+        </video>
+        <!-- Overlay badge -->
+        <div style="position: absolute; top: 12px; left: 12px; background: rgba(2,6,23,0.8); border: 1px solid var(--primary); border-radius: 6px; padding: 4px 10px; font-size: 0.75rem; letter-spacing: 2px; color: var(--primary); font-weight: 700; text-transform: uppercase; backdrop-filter: blur(4px);">
+          ⚡ HIGGSFIELD · SEEDANCE 2.0 MINI
+        </div>
+        <!-- Skip button -->
+        <button id="boss-intro-skip-btn" onclick="" style="position: absolute; bottom: 12px; right: 12px; background: rgba(2,6,23,0.75); border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; padding: 5px 12px; font-size: 0.75rem; color: #94a3b8; cursor: pointer; backdrop-filter: blur(4px);">
+          Skip ▶▶
+        </button>
+      </div>
+
+      <!-- Info section -->
+      <div style="padding: 22px 28px 26px;">
+        <h2 id="boss-intro-title" class="text-glow" style="font-size: 1.6rem; margin: 0 0 8px; color: #ef4444; text-shadow: 0 0 15px rgba(239, 68, 68, 0.5);">BOSS WARNING</h2>
+        <p id="boss-intro-desc" style="color: var(--text-secondary); font-size: 0.9rem; margin-bottom: 20px; line-height: 1.5;">A corrupted entity stands in your way...</p>
+        <button id="boss-intro-enter-btn" class="cta-btn primary" style="width: 100%; padding: 14px; font-size: 1.05rem; font-weight: 700; letter-spacing: 1px;">
+          ⚔️ ENTER ARENA &amp; ENGAGE
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Combat Impact Overlay (Super Effective / Quick-Think Critical) -->
+  <div id="combat-impact-overlay" class="combat-impact-overlay hidden">
+    <div id="combat-impact-badge" class="combat-impact-badge">
+      <span id="combat-impact-icon">⚡</span>
+      <span id="combat-impact-text">QUICK THINK CRITICAL!</span>
+    </div>
+  </div>
+
+  <!-- Level Up Overlay Modal -->
+  <div id="level-up-modal" class="modal hidden">
+    <div class="modal-card glass level-up-glow">
+      <div class="modal-icon">🎉</div>
+      <h2 class="level-up-title text-glow">LEVEL UP!</h2>
+      <p>Congratulations, Wizard! You have reached level <span id="level-up-num">2</span>!</p>
+      <div class="level-up-rewards">
+        <div>🪙 +100 Gold</div>
+        <div>❤️ HP Refilled</div>
+        <div>💧 MP Refilled</div>
+      </div>
+      <button id="level-up-close-btn" class="cta-btn primary">Claim Rewards</button>
+    </div>
+  </div>
+
+  <!-- Item Purchase Acquired Popup Modal -->
+  <div id="item-acquired-modal" class="modal hidden" style="z-index: 10000;">
+    <div class="modal-card glass item-acquired-card" style="text-align: center; max-width: 380px; padding: 28px; border: 2px solid #f59e0b; background: rgba(15, 23, 42, 0.95); box-shadow: 0 0 35px rgba(245, 158, 11, 0.35); animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+      <div id="acquired-item-icon" style="font-size: 3.2rem; margin-bottom: 8px; filter: drop-shadow(0 0 10px rgba(245, 158, 11, 0.6));">🔮</div>
+      <div style="font-size: 0.8rem; font-weight: 800; color: #f59e0b; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px;">🎉 Item Acquired!</div>
+      <h3 id="acquired-item-name" style="margin: 0 0 8px; color: #fef3c7; font-size: 1.3rem; font-weight: 800;">Archmage Staff</h3>
+      <p id="acquired-item-desc" style="color: #94a3b8; font-size: 0.95rem; margin-bottom: 20px; line-height: 1.4;">Added to your inventory (+15 Spell Power Equipped)!</p>
+      <button id="close-item-acquired-btn" class="cta-btn primary" style="width: 100%; padding: 12px; font-size: 1rem; font-weight: 700;">Continue Shopping</button>
+    </div>
+  </div>
+
+  <!-- Interactive Medieval Merchant Shop Modal -->
+  <div id="medieval-merchant-modal" class="modal hidden">
+    <div class="modal-card medieval-market-container" style="max-width: 650px; width: 90%; padding: 24px; position: relative;">
+      <button id="close-merchant-modal-btn" style="position: absolute; top: 16px; right: 16px; background: #78350f; border: 1.5px solid #f59e0b; color: #fffbeb; font-weight: 800; border-radius: 50%; width: 32px; height: 32px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1rem;">✕</button>
+      
+      <div class="medieval-shop-header" style="margin-bottom: 16px;">
+        <div class="medieval-banner-sign">
+          <span class="shop-sign-icon" id="merchant-modal-icon">🧪</span>
+          <h2 id="merchant-modal-name">Alchemist Gideon</h2>
+        </div>
+        <div class="shopkeeper-dialogue-box">
+          <div class="shopkeeper-avatar" id="merchant-modal-avatar">🧙‍♂️</div>
+          <div class="shopkeeper-text">
+            <span class="shopkeeper-title" id="merchant-modal-title">Master Alchemist</span>
+            <p class="shopkeeper-quote" id="merchant-modal-quote">"Greetings traveler! Browse my finest potions and elixirs."</p>
+          </div>
+        </div>
+      </div>
+
+      <div id="merchant-items-grid" class="shop-item-grid" style="grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px;">
+        <!-- Filtered merchant items render dynamically here -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Javascript Modules -->
+  <script src="src/audio.js"></script>
+  <script src="src/questions.js?v=65"></script>
+  <script src="src/battle.js?v=65"></script>
+  <script src="src/higgsfield.js?v=65"></script>
+  <script src="src/dashboard.js?v=65"></script>
+  <script src="src/main.js?v=65"></script>
+</body>
+</html>
