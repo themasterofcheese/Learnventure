@@ -75,12 +75,15 @@ const App = (() => {
     }
 
     // Set up HUD Navigation Events
-    const navs = ['map', 'shop', 'lab', 'dashboard', 'allies'];
+    const navs = ['map', 'shop', 'lab', 'dashboard', 'allies', 'pvp'];
     navs.forEach(navId => {
-      document.getElementById(`nav-${navId}`).addEventListener('click', () => {
-        if (window.AudioEngine) window.AudioEngine.playClick();
-        navigateToScreen(navId);
-      });
+      const btn = document.getElementById(`nav-${navId}`);
+      if (btn) {
+        btn.addEventListener('click', () => {
+          if (window.AudioEngine) window.AudioEngine.playClick();
+          navigateToScreen(navId);
+        });
+      }
     });
 
     document.getElementById('hud-grade-select').addEventListener('change', (e) => {
@@ -246,21 +249,23 @@ const App = (() => {
     window.HiggsfieldEngine.init();
   };
 
-  // 2D Canvas Map Movement and Encounter Engine (1800x880 World Map)
-  const WORLD_WIDTH = 1800;
-  const WORLD_HEIGHT = 880;
+  // 2D Canvas Map Movement and Encounter Engine (3600x1760 4x Quadruple-Sized World Map)
+  const WORLD_WIDTH = 3600;
+  const WORLD_HEIGHT = 1760;
 
   const getSpawnCoords = (element) => {
-    if (element === 'fire') return { x: 1350, y: 220 }; // Chem Realm (Top Right)
-    if (element === 'water') return { x: 450, y: 220 }; // Math Realm (Top Left)
-    if (element === 'earth') return { x: 450, y: 660 }; // Bio Realm (Bottom Left)
-    if (element === 'air') return { x: 1350, y: 660 }; // Phys Realm (Bottom Right)
-    return { x: 900, y: 440 }; // World Central Core
+    if (element === 'fire') return { x: 2700, y: 440 }; // Chem Realm (Top Right)
+    if (element === 'water') return { x: 900, y: 440 }; // Math Realm (Top Left)
+    if (element === 'earth') return { x: 900, y: 1320 }; // Bio Realm (Bottom Left)
+    if (element === 'air') return { x: 2700, y: 1320 }; // Phys Realm (Bottom Right)
+    return { x: 1800, y: 880 }; // World Central Core
   };
 
-  let playerX = 450;
-  let playerY = 220;
-  let keys = { up: false, down: false, left: false, right: false };
+  let playerX = 1800;
+  let playerY = 880;
+  let playerZ = 0; // 3D Height Off Ground (Z-axis)
+  let playerVZ = 0; // Vertical Jump Velocity
+  let keys = { up: false, down: false, left: false, right: false, space: false };
   let mapInterval = null;
   let lastCollidedMinionId = null;
   let minions = [];
@@ -269,6 +274,30 @@ const App = (() => {
   // Market Realm State & Stationary Merchant Entities
   let inMarket = false;
   let marketReturnCoords = { x: 900, y: 440 };
+
+  const marketBgImg = new Image();
+  marketBgImg.src = 'assets/market_map_bg.jpg';
+
+  const shatteredContinentBgImg = new Image();
+  shatteredContinentBgImg.src = 'assets/map_layout_option_d.jpg';
+
+  const merchantSprites = {
+    alchemist: new Image(),
+    wandsmith: new Image(),
+    tailor: new Image(),
+    picky_merchant: new Image()
+  };
+  merchantSprites.alchemist.src = 'assets/merchant_alchemist.jpg';
+  merchantSprites.wandsmith.src = 'assets/merchant_wandsmith.jpg';
+  merchantSprites.tailor.src = 'assets/merchant_tailor.jpg';
+  merchantSprites.picky_merchant.src = 'assets/merchant_picky.jpg';
+
+  const chestSprites = {
+    closed: new Image(),
+    open: new Image()
+  };
+  chestSprites.closed.src = 'assets/chest_closed.jpg';
+  chestSprites.open.src = 'assets/chest_open.jpg';
 
   const marketEntities = [
     {
@@ -302,21 +331,35 @@ const App = (() => {
       name: "Royal Tailor & Relics",
       title: "Arcane Tailor & Relic Vault",
       quote: `"Protective Aether Robes and Quantum Rings of power! Step closer and admire the craftsmanship."`,
-      x: 310,
+      x: 480,
       y: 220,
       radius: 32,
       avatar: "🧝‍♂️",
       icon: "🧵",
       color: "#ec4899",
       items: ['robe_aether', 'ring_quantum']
+    },
+    {
+      id: 'picky_merchant',
+      name: "Picky Merchant Barnaby",
+      title: "Picky Merchant & Collector",
+      quote: `"Hmm... I only buy the finest goods! Show me your inventory and I'll grant you gold coins for your items!"`,
+      x: 140,
+      y: 220,
+      radius: 32,
+      avatar: "🧐",
+      icon: "⚖️",
+      color: "#10b981",
+      isSellMerchant: true,
+      items: []
     }
   ];
 
   const bosses = [
-    { subject: 'math', x: 450, y: 220, radius: 25, emoji: '🔱' },
-    { subject: 'chem', x: 1350, y: 220, radius: 25, emoji: '🪐' },
-    { subject: 'bio', x: 450, y: 660, radius: 25, emoji: '🧬' },
-    { subject: 'phys', x: 1350, y: 660, radius: 25, emoji: '⚛️' }
+    { subject: 'math', x: 1000, y: 450, radius: 25, emoji: '🔱' },
+    { subject: 'chem', x: 2600, y: 450, radius: 25, emoji: '🪐' },
+    { subject: 'bio', x: 1000, y: 1300, radius: 25, emoji: '🧬' },
+    { subject: 'phys', x: 2600, y: 1300, radius: 25, emoji: '⚛️' }
   ];
 
   // Preload Sprite Graphic Assets
@@ -492,54 +535,82 @@ const App = (() => {
 
   let inDungeon = false;
   let activeDungeonId = null;
-  let surfaceReturnCoords = { x: 900, y: 440 };
+  let surfaceReturnCoords = { x: 1800, y: 880 };
 
   const dungeonPortals = [
-    // 4 Mineshaft Dungeon Entrances placed in clear space
-    { id: 'dungeon_math', x: 720, y: 100, realm: 'math', name: '⛏️ Ancient Math Mineshaft', color: '#3b82f6' },
-    { id: 'dungeon_chem', x: 1680, y: 220, realm: 'chem', name: '⛏️ Volcanic Chemical Mineshaft', color: '#ef4444' },
-    { id: 'dungeon_bio', x: 120, y: 780, realm: 'bio', name: '⛏️ Bioluminescent Abyss Mineshaft', color: '#22c55e' },
-    { id: 'dungeon_phys', x: 1680, y: 780, realm: 'phys', name: '⛏️ Quantum Spacetime Mineshaft', color: '#a855f7' }
+    // 4 Built-in 3D Mineshaft Dungeon Entrances across the 3600x1760 4x Open World Map
+    { id: 'dungeon_math', x: 650, y: 350, realm: 'math', name: '⛏️ Ancient Math Catacombs Mineshaft', color: '#3b82f6' },
+    { id: 'dungeon_chem', x: 2950, y: 350, realm: 'chem', name: '⛏️ Volcanic Chemical Mineshaft', color: '#ef4444' },
+    { id: 'dungeon_bio', x: 650, y: 1450, realm: 'bio', name: '⛏️ Bioluminescent Abyss Mineshaft', color: '#22c55e' },
+    { id: 'dungeon_phys', x: 2950, y: 1450, realm: 'phys', name: '⛏️ Quantum Spacetime Vault Mineshaft', color: '#a855f7' }
   ];
 
-  // Environment Obstacles Database for 1800x880 world map
+  // Environment 3D Obstacles Database for 3600x1760 Quadruple-Sized 3D World Map
   const obstacles = [
-    // Math Peaks Obstacles (Top-Left 0..900, 0..440)
-    { type: 'rect', x: 120, y: 80, w: 140, h: 60, color: '#047857', label: 'peaks' },
-    { type: 'rect', x: 600, y: 220, w: 60, h: 140, color: '#047857', label: 'peaks' },
-    { type: 'rect', x: 280, y: 280, w: 120, h: 50, color: '#047857', label: 'peaks' },
-    // Chem Ruins Obstacles (Top-Right 900..1800, 0..440)
-    { type: 'rect', x: 1050, y: 100, w: 60, h: 150, color: '#a16207', label: 'ruins' },
-    { type: 'rect', x: 1400, y: 80, w: 160, h: 50, color: '#a16207', label: 'ruins' },
-    { type: 'rect', x: 1200, y: 290, w: 130, h: 60, color: '#a16207', label: 'ruins' },
-    // Bio Jungle Obstacles (Bottom-Left 0..900, 440..880)
-    { type: 'rect', x: 150, y: 520, w: 160, h: 60, color: '#1d4ed8', label: 'swamp' },
-    { type: 'rect', x: 620, y: 650, w: 60, h: 140, color: '#1d4ed8', label: 'swamp' },
-    { type: 'rect', x: 350, y: 720, w: 140, h: 50, color: '#1d4ed8', label: 'swamp' },
-    // Phys Dynamo Obstacles (Bottom-Right 900..1800, 440..880)
-    { type: 'rect', x: 1100, y: 520, w: 120, h: 60, color: '#9f1239', label: 'dynamo' },
-    { type: 'rect', x: 1520, y: 620, w: 60, h: 150, color: '#9f1239', label: 'dynamo' },
-    { type: 'rect', x: 1280, y: 740, w: 140, h: 50, color: '#9f1239', label: 'dynamo' }
+    // Math Glacial Peaks & Crystal Monoliths (Top-Left 0..1800, 0..880)
+    { type: 'rect', x: 240, y: 160, w: 280, h: 120, height: 110, color: '#047857', label: 'peaks' },
+    { type: 'rect', x: 1160, y: 360, w: 140, h: 280, height: 130, color: '#047857', label: 'peaks' },
+    { type: 'rect', x: 560, y: 560, w: 240, h: 100, height: 95, color: '#047857', label: 'peaks' },
+
+    // Chem Acid Ruins & Alchemical Vats (Top-Right 1800..3600, 0..880)
+    { type: 'rect', x: 2100, y: 200, w: 140, h: 300, height: 120, color: '#a16207', label: 'ruins' },
+    { type: 'rect', x: 2800, y: 160, w: 320, h: 100, height: 100, color: '#a16207', label: 'ruins' },
+    { type: 'rect', x: 2400, y: 580, w: 260, h: 120, height: 105, color: '#a16207', label: 'ruins' },
+
+    // Bio Ancient Oak Canopy & Giant Mushrooms (Bottom-Left 0..1800, 880..1760)
+    { type: 'rect', x: 300, y: 1040, w: 320, h: 120, height: 120, color: '#1d4ed8', label: 'swamp' },
+    { type: 'rect', x: 1240, y: 1300, w: 140, h: 280, height: 140, color: '#1d4ed8', label: 'swamp' },
+    { type: 'rect', x: 700, y: 1440, w: 280, h: 100, height: 95, color: '#1d4ed8', label: 'swamp' },
+
+    // Phys Volcanic Dynamos & Tesla Towers (Bottom-Right 1800..3600, 880..1760)
+    { type: 'rect', x: 2200, y: 1040, w: 240, h: 120, height: 130, color: '#9f1239', label: 'dynamo' },
+    { type: 'rect', x: 3040, y: 1240, w: 140, h: 300, height: 150, color: '#9f1239', label: 'dynamo' },
+    { type: 'rect', x: 2560, y: 1480, w: 280, h: 100, height: 110, color: '#9f1239', label: 'dynamo' }
   ];
 
   const obstaclePrettyLabels = {
-    peaks: '⛰️ Peaks',
-    ruins: '🧱 Ruins',
-    swamp: '🌳 Swamp',
-    dynamo: '⚡ Dynamo'
+    peaks: '⛰️ Math Glacial Monolith',
+    ruins: '🧱 Chem Acid Ruins',
+    swamp: '🌳 Bio Canopy Oak',
+    dynamo: '⚡ Tesla Dynamos'
   };
 
   const checkObstacleCollision = (x, y, r) => {
-    // Inside subterranean dungeon or Market map, surface obstacles do NOT block movement!
     if (inDungeon || inMarket) {
       return false;
     }
 
-    // 1. Central Core Check on Surface Map (Core is center X: 900, Y: 440, radius: 45)
-    const coreDist = Math.hypot(x - 900, y - 440);
-    if (coreDist < r + 45) return true;
+    // 1. Solid Outer Boundary Cliff Walls (3600x1760 World Boundaries - Player Cannot Go Off Map Edges)
+    if (x <= 60 || x >= 3540 || y <= 60 || y >= 1700) {
+      return true;
+    }
 
-    // 2. Rectangular obstacles check on Surface Map
+    // 2. 3D Terrain Height-Slope Cliff Collision (Steep Rock Cliffs Cannot Be Walked Over)
+    if (window.World3DEngine) {
+      const map3DX = ((x / 3600) * 180) - 90;
+      const map3DZ = ((y / 1760) * 80) - 40;
+      const tH = window.World3DEngine.getTerrainHeight(map3DX, map3DZ);
+      // Impassable outer mountain walls or deep rift chasms
+      if (tH > 18.0 || tH < -6.0) {
+        return true;
+      }
+    }
+
+    // 2. Chasm Ledge Physics for Option D (Shattered Continent Chasms across 3600x1760)
+    // Central Stone Crossroads Bridge is at X: 1720..1880, Y: 810..950
+    const onBridge = (x >= 1720 && x <= 1880 && y >= 810 && y <= 950);
+    if (!onBridge) {
+      // Vertical Energy Chasm (X: 1760..1840)
+      if (x > 1760 && x < 1840) return true;
+      // Horizontal Energy Chasm (Y: 840..920)
+      if (y > 840 && y < 920) return true;
+    }
+
+    // 3. Central Obelisk Monument Base Check (X: 1800, Y: 880, radius: 55)
+    const coreDist = Math.hypot(x - 1800, y - 880);
+    if (coreDist < r + 55) return true;
+
+    // 4. 3D Obstacle Footprint Collision Check
     for (let obs of obstacles) {
       const closestX = Math.max(obs.x, Math.min(x, obs.x + obs.w));
       const closestY = Math.max(obs.y, Math.min(y, obs.y + obs.h));
@@ -549,7 +620,100 @@ const App = (() => {
     return false;
   };
 
+  const dungeonChestsDatabase = {
+    dungeon_math: [
+      { id: 'chest_math_1', x: 220, y: 160, radius: 22, opened: false },
+      { id: 'chest_math_2', x: 1580, y: 220, radius: 22, opened: false },
+      { id: 'chest_math_3', x: 920, y: 720, radius: 22, opened: false }
+    ],
+    dungeon_chem: [
+      { id: 'chest_chem_1', x: 280, y: 700, radius: 22, opened: false },
+      { id: 'chest_chem_2', x: 1520, y: 180, radius: 22, opened: false },
+      { id: 'chest_chem_3', x: 880, y: 220, radius: 22, opened: false }
+    ],
+    dungeon_bio: [
+      { id: 'chest_bio_1', x: 180, y: 220, radius: 22, opened: false },
+      { id: 'chest_bio_2', x: 1620, y: 720, radius: 22, opened: false },
+      { id: 'chest_bio_3', x: 1080, y: 680, radius: 22, opened: false }
+    ],
+    dungeon_phys: [
+      { id: 'chest_phys_1', x: 320, y: 720, radius: 22, opened: false },
+      { id: 'chest_phys_2', x: 1420, y: 220, radius: 22, opened: false },
+      { id: 'chest_phys_3', x: 920, y: 180, radius: 22, opened: false }
+    ]
+  };
+
+  let activeDungeonChests = [];
+
+  const initDungeonChests = (dungeonId = 'dungeon_math') => {
+    let openedState = {};
+    try {
+      const saved = localStorage.getItem('knowledge_quest_chests');
+      if (saved) openedState = JSON.parse(saved);
+    } catch (e) {}
+
+    const defaults = dungeonChestsDatabase[dungeonId] || dungeonChestsDatabase.dungeon_math;
+    activeDungeonChests = defaults.map(c => ({
+      ...c,
+      opened: !!openedState[c.id]
+    }));
+  };
+
+  const showChestLootModal = (goldAmount, droppedItem) => {
+    const modal = document.getElementById('chest-loot-modal');
+    if (!modal) return;
+
+    const detailsEl = document.getElementById('chest-loot-details');
+    
+    const itemNames = {
+      potion_hp: { name: "HP Healing Potion", icon: "❤️", desc: "Restores 50 HP in battle!" },
+      potion_mp: { name: "Mana Elixir", icon: "💧", desc: "Restores 40 MP in battle!" },
+      wand_apprentice: { name: "Apprentice Wand", icon: "🪄", desc: "+8 Spell Power!" },
+      staff_archmage: { name: "Archmage Staff", icon: "🔮", desc: "+15 Spell Power!" },
+      robe_aether: { name: "Aether Robes", icon: "🥋", desc: "+35 Max HP!" },
+      ring_quantum: { name: "Quantum Ring", icon: "💍", desc: "+25 Max MP!" }
+    };
+
+    let html = `
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        <span style="font-size: 1.6rem;">🪙</span>
+        <div>
+          <strong style="color: #fbbf24; font-size: 1.05rem;">+${goldAmount} Gold Coins</strong>
+          <div style="font-size: 0.8rem; color: #94a3b8;">Added directly to your gold balance!</div>
+        </div>
+      </div>
+    `;
+
+    if (droppedItem && itemNames[droppedItem]) {
+      const info = itemNames[droppedItem];
+      html += `
+        <div style="display: flex; align-items: center; gap: 12px; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+          <span style="font-size: 1.6rem;">${info.icon}</span>
+          <div>
+            <strong style="color: #4ade80; font-size: 1.05rem;">BONUS ITEM: ${info.name}</strong>
+            <div style="font-size: 0.8rem; color: #cbd5e1;">${info.desc}</div>
+          </div>
+        </div>
+      `;
+    } else {
+      html += `
+        <div style="margin-top: 6px; font-size: 0.82rem; color: #64748b; font-style: italic;">
+          (No bonus equipment dropped this time)
+        </div>
+      `;
+    }
+
+    detailsEl.innerHTML = html;
+    modal.classList.remove('hidden');
+
+    document.getElementById('close-chest-loot-btn').onclick = () => {
+      if (window.AudioEngine) window.AudioEngine.playClick();
+      modal.classList.add('hidden');
+    };
+  };
+
   const initDungeonMinions = (dungeonId = 'dungeon_math') => {
+    initDungeonChests(dungeonId);
     // Dungeon Exclusive Monsters (NO surface minions inside dungeons!)
     if (dungeonId === 'dungeon_chem') {
       minions = [
@@ -581,6 +745,11 @@ const App = (() => {
         { id: 'dung_math_4', subject: 'bio', name: 'Nether Hydra', sprite: 'assets/minion_dungeon_hydra.jpg', x: 1500, y: 650, vx: -1.3, vy: -1.1, radius: 18, emoji: '🐍', active: true }
       ];
     }
+
+    // 5% Chance for each dungeon monster to spawn as Special ⭐
+    minions.forEach(m => {
+      m.isSpecial = Math.random() < 0.05;
+    });
   };
 
   const initAdventureMinions = () => {
@@ -588,25 +757,32 @@ const App = (() => {
       initDungeonMinions(activeDungeonId);
       return;
     }
-    // Default minions per quadrant across 1800x880 world map (Matching exact battle monsters)
+    // Default minions per quadrant across 3600x1760 world map
     minions = [
-      // Math Minions (Top Left 0..900, 0..440)
-      { id: 'math_1', subject: 'math', name: 'Fraction Wraith', sprite: 'assets/minion_math_wraith.jpg', x: 220, y: 150, vx: 1.2, vy: 1, radius: 15, emoji: '🔢', active: true },
-      { id: 'math_2', subject: 'math', name: 'Equation Imp', sprite: 'assets/minion_math_imp.jpg', x: 680, y: 280, vx: -1, vy: 1.2, radius: 15, emoji: '✖️', active: true },
-      { id: 'math_3', subject: 'math', name: 'Fraction Wraith', sprite: 'assets/minion_math_wraith.jpg', x: 350, y: 100, vx: 0.8, vy: -1, radius: 15, emoji: '🔢', active: true },
-      // Chem Minions (Top Right 900..1800, 0..440)
-      { id: 'chem_1', subject: 'chem', name: 'Periodic Pixie', sprite: 'assets/minion_chem_pixie.jpg', x: 1120, y: 150, vx: 1, vy: -1.2, radius: 15, emoji: '🧪', active: true },
-      { id: 'chem_2', subject: 'chem', name: 'Acid Sludge', sprite: 'assets/minion_chem_sludge.jpg', x: 1580, y: 280, vx: -1.2, vy: -0.8, radius: 15, emoji: '☣️', active: true },
-      { id: 'chem_3', subject: 'chem', name: 'Periodic Pixie', sprite: 'assets/minion_chem_pixie.jpg', x: 1300, y: 100, vx: -0.8, vy: 1.2, radius: 15, emoji: '🧪', active: true },
-      // Bio Minions (Bottom Left 0..900, 440..880)
-      { id: 'bio_1', subject: 'bio', name: 'Cellular Slime', sprite: 'assets/minion_bio_slime.jpg', x: 220, y: 590, vx: 0.9, vy: 1.2, radius: 15, emoji: '🦠', active: true },
-      { id: 'bio_2', subject: 'bio', name: 'Chloroplast Spore', sprite: 'assets/minion_bio_spore.jpg', x: 680, y: 720, vx: -1.2, vy: -0.9, radius: 15, emoji: '🍃', active: true },
-      { id: 'bio_3', subject: 'bio', name: 'Cellular Slime', sprite: 'assets/minion_bio_slime.jpg', x: 350, y: 520, vx: 0.8, vy: -0.8, radius: 15, emoji: '🦠', active: true },
-      // Phys Minions (Bottom Right 900..1800, 440..880)
-      { id: 'phys_1', subject: 'phys', name: 'Kinetic Imp', sprite: 'assets/minion_phys_imp.jpg', x: 1120, y: 590, vx: -1, vy: 1.2, radius: 15, emoji: '🏃', active: true },
-      { id: 'phys_2', subject: 'phys', name: 'Magnetic Basilisk', sprite: 'assets/minion_phys_basilisk.jpg', x: 1580, y: 720, vx: 1.2, vy: -1, radius: 15, emoji: '🧲', active: true },
-      { id: 'phys_3', subject: 'phys', name: 'Kinetic Imp', sprite: 'assets/minion_phys_imp.jpg', x: 1300, y: 520, vx: -0.9, vy: -0.9, radius: 15, emoji: '🏃', active: true }
+      // Math Minions (Top Left 0..1800, 0..880)
+      { id: 'math_1', subject: 'math', name: 'Fraction Wraith', sprite: 'assets/minion_math_wraith.jpg', x: 440, y: 300, vx: 1.4, vy: 1.1, radius: 15, emoji: '🔢', active: true },
+      { id: 'math_2', subject: 'math', name: 'Equation Imp', sprite: 'assets/minion_math_imp.jpg', x: 1360, y: 560, vx: -1.1, vy: 1.4, radius: 15, emoji: '✖️', active: true },
+      { id: 'math_3', subject: 'math', name: 'Fraction Wraith', sprite: 'assets/minion_math_wraith.jpg', x: 700, y: 200, vx: 0.9, vy: -1.2, radius: 15, emoji: '🔢', active: true },
+      // Chem Minions (Top Right 1800..3600, 0..880)
+      { id: 'chem_1', subject: 'chem', name: 'Periodic Pixie', sprite: 'assets/minion_chem_pixie.jpg', x: 2240, y: 300, vx: 1.2, vy: -1.4, radius: 15, emoji: '🧪', active: true },
+      { id: 'chem_2', subject: 'chem', name: 'Acid Sludge', sprite: 'assets/minion_chem_sludge.jpg', x: 3160, y: 560, vx: -1.4, vy: -0.9, radius: 15, emoji: '☣️', active: true },
+      { id: 'chem_3', subject: 'chem', name: 'Periodic Pixie', sprite: 'assets/minion_chem_pixie.jpg', x: 2600, y: 200, vx: -0.9, vy: 1.3, radius: 15, emoji: '🧪', active: true },
+      // Bio Minions (Bottom Left 0..1800, 880..1760)
+      { id: 'bio_1', subject: 'bio', name: 'Cellular Slime', sprite: 'assets/minion_bio_slime.jpg', x: 440, y: 1180, vx: 1.1, vy: 1.4, radius: 15, emoji: '🦠', active: true },
+      { id: 'bio_2', subject: 'bio', name: 'Chloroplast Spore', sprite: 'assets/minion_bio_spore.jpg', x: 1360, y: 1440, vx: -1.4, vy: -1.1, radius: 15, emoji: '🍃', active: true },
+      { id: 'bio_3', subject: 'bio', name: 'Cellular Slime', sprite: 'assets/minion_bio_slime.jpg', x: 700, y: 1040, vx: 0.9, vy: -0.9, radius: 15, emoji: '🦠', active: true },
+      // Phys Minions (Bottom Right 1800..3600, 880..1760)
+      { id: 'phys_1', subject: 'phys', name: 'Kinetic Imp', sprite: 'assets/minion_phys_imp.jpg', x: 2240, y: 1180, vx: -1.1, vy: 1.4, radius: 15, emoji: '🏃', active: true },
+      { id: 'phys_2', subject: 'phys', name: 'Magnetic Basilisk', sprite: 'assets/minion_phys_basilisk.jpg', x: 3160, y: 1440, vx: 1.4, vy: -1.1, radius: 15, emoji: '🧲', active: true },
+      { id: 'phys_3', subject: 'phys', name: 'Kinetic Imp', sprite: 'assets/minion_phys_imp.jpg', x: 2600, y: 1040, vx: -1.0, vy: -1.0, radius: 15, emoji: '🏃', active: true }
     ];
+
+    // Deactivate surface minions of any realm whose Boss has been defeated!
+    minions.forEach(m => {
+      if (player.defeatedBosses && player.defeatedBosses[m.subject]) {
+        m.active = false;
+      }
+    });
   };
 
   const showItemAcquiredModal = (itemId) => {
@@ -654,41 +830,119 @@ const App = (() => {
     document.getElementById('merchant-modal-title').innerText = merchant.title;
     document.getElementById('merchant-modal-quote').innerText = merchant.quote;
 
+    const modalSprite = document.getElementById('merchant-modal-sprite');
+    if (modalSprite) {
+      modalSprite.src = `assets/merchant_${merchant.id === 'picky_merchant' ? 'picky' : merchant.id}.jpg`;
+    }
+
     const itemsGrid = document.getElementById('merchant-items-grid');
     const allShopCards = document.querySelectorAll('#screen-shop .shop-item-card');
     const costs = { potion_hp: 50, potion_mp: 40, wand_apprentice: 100, staff_archmage: 250, robe_aether: 180, ring_quantum: 150 };
 
     itemsGrid.innerHTML = '';
-    merchant.items.forEach(itemId => {
-      const templateCard = Array.from(allShopCards).find(card => card.querySelector(`[data-item="${itemId}"]`));
-      if (templateCard) {
-        const clonedCard = templateCard.cloneNode(true);
-        const buyBtn = clonedCard.querySelector('.buy-item-btn');
-        if (buyBtn) {
-          buyBtn.onclick = () => {
-            const cost = costs[itemId];
-            if (player.gold < cost) {
-              if (window.AudioEngine) window.AudioEngine.playIncorrect();
-              alert("Insufficient Gold! Answer more questions in battle to earn gold.");
-              return;
-            }
-            if (itemId !== 'potion_hp' && itemId !== 'potion_mp' && player.inventory.includes(itemId)) {
-              if (window.AudioEngine) window.AudioEngine.playIncorrect();
-              alert("You already own this piece of gear!");
-              return;
-            }
-            player.gold -= cost;
-            player.inventory.push(itemId);
-            if (window.AudioEngine) window.AudioEngine.playCoin();
-            saveState();
-            updateHUD();
-            showItemAcquiredModal(itemId);
-            if (window.DashboardEngine) window.DashboardEngine.updateDashboardUI();
-          };
+
+    if (merchant.isSellMerchant) {
+      const itemDetails = {
+        potion_hp: { name: "HP Healing Potion", icon: "❤️", sellPrice: 25 },
+        potion_mp: { name: "Mana Elixir", icon: "💧", sellPrice: 20 },
+        wand_apprentice: { name: "Apprentice Wand", icon: "🪄", sellPrice: 50 },
+        staff_archmage: { name: "Archmage Staff", icon: "🔮", sellPrice: 125 },
+        robe_aether: { name: "Aether Robes", icon: "🥋", sellPrice: 90 },
+        ring_quantum: { name: "Quantum Ring", icon: "💍", sellPrice: 75 }
+      };
+
+      const renderSellGrid = () => {
+        itemsGrid.innerHTML = '';
+        if (!player.inventory || player.inventory.length === 0) {
+          itemsGrid.innerHTML = `<div style="grid-column: 1 / -1; text-align: center; padding: 40px 20px; color: #94a3b8; font-weight: 600; font-size: 1rem; background: rgba(15, 23, 42, 0.6); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.15);">You have no items in your inventory to sell to Barnaby!</div>`;
+          return;
         }
-        itemsGrid.appendChild(clonedCard);
-      }
-    });
+
+        const counts = {};
+        player.inventory.forEach(item => {
+          counts[item] = (counts[item] || 0) + 1;
+        });
+
+        Object.keys(counts).forEach(itemId => {
+          const info = itemDetails[itemId] || { name: itemId, icon: "📦", sellPrice: 15 };
+          const qty = counts[itemId];
+
+          const sellCard = document.createElement('div');
+          sellCard.className = 'shop-item-card';
+          sellCard.style.border = '1px solid rgba(16, 185, 129, 0.4)';
+          sellCard.style.background = 'rgba(15, 23, 42, 0.85)';
+
+          sellCard.innerHTML = `
+            <div class="shop-item-header">
+              <span class="shop-item-icon">${info.icon}</span>
+              <div>
+                <h4 class="shop-item-title" style="color: #fef3c7;">${info.name} ${qty > 1 ? `<span style="color:#4ade80;">x${qty}</span>` : ''}</h4>
+                <p class="shop-item-cost" style="color: #4ade80;">Resale Value: 🪙 ${info.sellPrice} Gold</p>
+              </div>
+            </div>
+            <p class="shop-item-desc" style="font-size: 0.82rem; color: #cbd5e1; margin: 8px 0;">Barnaby inspects this item and offers ${info.sellPrice} Gold Coins in cash!</p>
+            <button class="cta-btn primary sell-item-btn" style="width:100%; margin-top:10px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); font-weight: 700; font-size: 0.88rem;">
+              💰 Sell Item (+${info.sellPrice} Gold)
+            </button>
+          `;
+
+          sellCard.querySelector('.sell-item-btn').onclick = () => {
+            const idx = player.inventory.indexOf(itemId);
+            if (idx > -1) {
+              player.inventory.splice(idx, 1);
+              player.gold += info.sellPrice;
+
+              // Unequip if no longer in inventory
+              if (player.equipped.staff === itemId && !player.inventory.includes(itemId)) player.equipped.staff = null;
+              if (player.equipped.robe === itemId && !player.inventory.includes(itemId)) player.equipped.robe = null;
+              if (player.equipped.ring === itemId && !player.inventory.includes(itemId)) player.equipped.ring = null;
+
+              if (window.AudioEngine) window.AudioEngine.playCoin();
+              saveState();
+              recalculateStats();
+              updateHUD();
+              if (window.DashboardEngine) window.DashboardEngine.updateDashboardUI();
+              renderSellGrid();
+            }
+          };
+
+          itemsGrid.appendChild(sellCard);
+        });
+      };
+
+      renderSellGrid();
+    } else {
+      merchant.items.forEach(itemId => {
+        const templateCard = Array.from(allShopCards).find(card => card.querySelector(`[data-item="${itemId}"]`));
+        if (templateCard) {
+          const clonedCard = templateCard.cloneNode(true);
+          const buyBtn = clonedCard.querySelector('.buy-item-btn');
+          if (buyBtn) {
+            buyBtn.onclick = () => {
+              const cost = costs[itemId];
+              if (player.gold < cost) {
+                if (window.AudioEngine) window.AudioEngine.playIncorrect();
+                alert("Insufficient Gold! Answer more questions in battle to earn gold.");
+                return;
+              }
+              if (itemId !== 'potion_hp' && itemId !== 'potion_mp' && player.inventory.includes(itemId)) {
+                if (window.AudioEngine) window.AudioEngine.playIncorrect();
+                alert("You already own this piece of gear!");
+                return;
+              }
+              player.gold -= cost;
+              player.inventory.push(itemId);
+              if (window.AudioEngine) window.AudioEngine.playCoin();
+              saveState();
+              updateHUD();
+              showItemAcquiredModal(itemId);
+              if (window.DashboardEngine) window.DashboardEngine.updateDashboardUI();
+            };
+          }
+          itemsGrid.appendChild(clonedCard);
+        }
+      });
+    }
 
     modal.classList.remove('hidden');
 
@@ -704,6 +958,12 @@ const App = (() => {
     if (e.key === 's' || e.key === 'S' || e.key === 'ArrowDown') keys.down = true;
     if (e.key === 'a' || e.key === 'A' || e.key === 'ArrowLeft') keys.left = true;
     if (e.key === 'd' || e.key === 'D' || e.key === 'ArrowRight') keys.right = true;
+    if (e.key === ' ' || e.code === 'Space') {
+      if (playerZ === 0) {
+        playerVZ = 6.5;
+        if (window.AudioEngine) window.AudioEngine.playClick();
+      }
+    }
     if (e.key === 'e' || e.key === 'E') {
       if (inMarket) {
         marketEntities.forEach(ent => {
@@ -759,7 +1019,19 @@ const App = (() => {
     if (!minions || minions.length < 12) {
       initAdventureMinions();
     }
-    minions.forEach(m => { m.active = true; });
+    minions.forEach(m => {
+      if (!inDungeon && player.defeatedBosses && player.defeatedBosses[m.subject]) {
+        m.active = false;
+      } else {
+        m.active = true;
+      }
+    });
+
+    // Initialize Three.js WebGL 3D Engine on dedicated adventure-canvas-3d
+    const canvas3D = document.getElementById('adventure-canvas-3d');
+    if (window.World3DEngine && window.THREE && canvas3D) {
+      window.World3DEngine.init(canvas3D);
+    }
 
     mapInterval = setInterval(() => {
       updateMapFrame(canvas, ctx);
@@ -777,6 +1049,7 @@ const App = (() => {
   };
 
   const updateMapFrame = (canvas, ctx) => {
+    const is3DActive = !!(window.World3DEngine && window.THREE);
     // 1. Move player
     let dx = 0; let dy = 0;
     if (keys.up) dy = -6;
@@ -790,21 +1063,33 @@ const App = (() => {
     }
     
     const isMoving = dx !== 0 || dy !== 0;
+    const pWalkFrame = Math.floor(Date.now() / 130) % 2;
+    const bobY = isMoving ? (pWalkFrame === 0 ? -3 : 3) : Math.sin(Date.now() / 400) * 1.0;
     
-    // Check independent axis movements for smooth sliding collisions (1800x880 World Bounds)
+    // Check independent axis movements for smooth sliding collisions (3600x1760 4x World Bounds)
     let nextX = playerX + dx;
     let nextY = playerY + dy;
     
-    if (nextX < 20) nextX = 20;
-    if (nextX > 1780) nextX = 1780;
-    if (nextY < 20) nextY = 20;
-    if (nextY > 860) nextY = 860;
+    if (nextX < 40) nextX = 40;
+    if (nextX > 3560) nextX = 3560;
+    if (nextY < 40) nextY = 40;
+    if (nextY > 1720) nextY = 1720;
 
     if (!checkObstacleCollision(nextX, playerY, 15)) {
       playerX = nextX;
     }
     if (!checkObstacleCollision(playerX, nextY, 15)) {
       playerY = nextY;
+    }
+    
+    // 1b. 3D Jump Physics (Z-axis elevation & gravity)
+    if (playerZ > 0 || playerVZ > 0) {
+      playerZ += playerVZ;
+      playerVZ -= 0.45; // Gravity pull down
+      if (playerZ <= 0) {
+        playerZ = 0;
+        playerVZ = 0;
+      }
     }
     
     // 2. Trail Particles update
@@ -832,6 +1117,10 @@ const App = (() => {
       // 3. Move Minions in their respective 900x440 quadrants
       minions.forEach(m => {
         if (!m.active) return;
+        if (!inDungeon && player.defeatedBosses && player.defeatedBosses[m.subject]) {
+          m.active = false;
+          return;
+        }
         m.x += m.vx;
         m.y += m.vy;
         
@@ -848,6 +1137,10 @@ const App = (() => {
       // 4. Collision check with minions
       for (let m of minions) {
         if (!m.active) continue;
+        if (!inDungeon && player.defeatedBosses && player.defeatedBosses[m.subject]) {
+          m.active = false;
+          continue;
+        }
         const dist = Math.hypot(playerX - m.x, playerY - m.y);
         if (dist < 25) {
           lastCollidedMinionId = m.id;
@@ -871,7 +1164,7 @@ const App = (() => {
             playerY = coords.y;
           }
           
-          window.BattleEngine.initBattle(player, m.subject, false, m.name);
+          window.BattleEngine.initBattle(player, m.subject, false, m.name, !!m.isSpecial);
           navigateToScreen('battle');
           return;
         }
@@ -906,7 +1199,7 @@ const App = (() => {
           }
           
           window.HiggsfieldEngine.triggerBossIntro(b.subject, () => {
-            window.BattleEngine.initBattle(player, b.subject);
+            window.BattleEngine.initBattle(player, b.subject, true);
             navigateToScreen('battle');
           });
           return;
@@ -941,22 +1234,17 @@ const App = (() => {
       // ----------------------------------------------------
       // FIXED-FRAME MEDIEVAL MARKET REALM (620x300 - Fits 100% inside FOV)
       // ----------------------------------------------------
-      ctx.fillStyle = '#1c130b';
-      ctx.fillRect(0, 0, 620, 300);
-
-      // Cobblestone Floor Pattern
-      ctx.strokeStyle = 'rgba(217, 119, 6, 0.12)';
-      ctx.lineWidth = 1;
-      for (let i = 0; i < 620; i += 40) {
-        for (let j = 0; j < 300; j += 40) {
-          ctx.strokeRect(i, j, 40, 40);
-        }
+      if (marketBgImg.complete || marketBgImg.src) {
+        ctx.drawImage(marketBgImg, 0, 0, 620, 300);
+      } else {
+        ctx.fillStyle = '#1c130b';
+        ctx.fillRect(0, 0, 620, 300);
       }
 
-      // Warm Ambient Market Lighting
+      // Warm Ambient Market Lighting Overlay
       const mGlow = ctx.createRadialGradient(310, 150, 40, 310, 150, 320);
-      mGlow.addColorStop(0, 'rgba(245, 158, 11, 0.2)');
-      mGlow.addColorStop(1, 'rgba(2, 6, 23, 0.75)');
+      mGlow.addColorStop(0, 'rgba(245, 158, 11, 0.15)');
+      mGlow.addColorStop(1, 'rgba(2, 6, 23, 0.55)');
       ctx.fillStyle = mGlow;
       ctx.fillRect(0, 0, 620, 300);
 
@@ -989,10 +1277,27 @@ const App = (() => {
           ctx.strokeRect(-22, 8, 44, 12);
         }
 
-        // Avatar Emoji
-        ctx.font = '22px Outfit';
-        ctx.textAlign = 'center';
-        ctx.fillText(ent.avatar, 0, 4);
+        // Render 3D Higgsfield Merchant Portrait Sprite!
+        const mImg = merchantSprites[ent.id];
+        if (mImg && (mImg.complete || mImg.src)) {
+          const tImg = getTransparentSprite(mImg);
+          if (tImg) {
+            ctx.save();
+            ctx.beginPath();
+            ctx.arc(0, -4, 18, 0, Math.PI * 2);
+            ctx.clip();
+            ctx.drawImage(tImg, -18, -22, 36, 36);
+            ctx.restore();
+          } else {
+            ctx.font = '22px Outfit';
+            ctx.textAlign = 'center';
+            ctx.fillText(ent.avatar, 0, 4);
+          }
+        } else {
+          ctx.font = '22px Outfit';
+          ctx.textAlign = 'center';
+          ctx.fillText(ent.avatar, 0, 4);
+        }
 
         // Merchant Name Tag
         ctx.font = 'bold 10px Outfit';
@@ -1022,38 +1327,57 @@ const App = (() => {
       });
     } else if (!inDungeon) {
       // ----------------------------------------------------
-      // SURFACE WORLD MAP (1800x880)
+      // SURFACE WORLD MAP (3600x1760 Playable Terrain)
       // ----------------------------------------------------
-      const drawBiomeGround = (img, x, y, w, h, fallbackCol) => {
-        if (img && img.complete && img.naturalWidth !== 0) {
-          ctx.drawImage(img, x, y, w, h);
-          ctx.fillStyle = 'rgba(2, 6, 23, 0.45)'; // Dark vignette overlay
-          ctx.fillRect(x, y, w, h);
-        } else {
-          ctx.fillStyle = fallbackCol;
-          ctx.fillRect(x, y, w, h);
-        }
-      };
-
-      drawBiomeGround(biomeBgImages.math, 0, 0, 900, 440, '#022c22'); // Math (Top Left)
-      drawBiomeGround(biomeBgImages.chem, 900, 0, 900, 440, '#1c1917'); // Chem (Top Right)
-      drawBiomeGround(biomeBgImages.bio, 0, 440, 900, 440, '#172554'); // Bio (Bottom Left)
-      drawBiomeGround(biomeBgImages.phys, 900, 440, 900, 440, '#310413'); // Phys (Bottom Right)
-
-      // Draw Cross-World Main Highways
-      ctx.fillStyle = 'rgba(255, 255, 255, 0.08)';
-      ctx.fillRect(885, 0, 30, 880); // Vertical Highway
-      ctx.fillRect(0, 425, 1800, 30); // Horizontal Highway
-
-      // Grid lines across 1800x880 world map
-      ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-      ctx.lineWidth = 1;
-      for (let i = 0; i < 1800; i += 60) {
-        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 880); ctx.stroke();
+      if (shatteredContinentBgImg && shatteredContinentBgImg.complete && shatteredContinentBgImg.naturalWidth !== 0) {
+        ctx.drawImage(shatteredContinentBgImg, 0, 0, 3600, 1760);
+      } else {
+        const drawBiomeGround = (img, x, y, w, h, fallbackCol) => {
+          if (img && img.complete && img.naturalWidth !== 0) {
+            ctx.drawImage(img, x, y, w, h);
+            ctx.fillStyle = 'rgba(2, 6, 23, 0.35)'; // Vignette overlay
+            ctx.fillRect(x, y, w, h);
+          } else {
+            ctx.fillStyle = fallbackCol;
+            ctx.fillRect(x, y, w, h);
+          }
+        };
+        drawBiomeGround(biomeBgImages.math, 0, 0, 1800, 880, '#022c22');
+        drawBiomeGround(biomeBgImages.chem, 1800, 0, 1800, 880, '#1c1917');
+        drawBiomeGround(biomeBgImages.bio, 0, 880, 1800, 880, '#172554');
+        drawBiomeGround(biomeBgImages.phys, 1800, 880, 1800, 880, '#310413');
       }
-      for (let j = 0; j < 880; j += 60) {
-        ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(1800, j); ctx.stroke();
-      }
+
+      // Outer Perimeter Impassable Cliff Border Outline
+      ctx.strokeStyle = 'rgba(56, 189, 248, 0.85)';
+      ctx.lineWidth = 14;
+      ctx.strokeRect(7, 7, 3586, 1746);
+      ctx.strokeStyle = '#0284c7';
+      ctx.lineWidth = 6;
+      ctx.strokeRect(3, 3, 3594, 1754);
+
+      // 2D Chasm Rifts
+      const chasmPulse = Math.sin(Date.now() / 250) * 3.5;
+      const riftGradV = ctx.createLinearGradient(1760, 0, 1840, 0);
+      riftGradV.addColorStop(0, 'rgba(56, 189, 248, 0.12)');
+      riftGradV.addColorStop(0.5, `rgba(56, 189, 248, ${0.45 + (chasmPulse / 20)})`);
+      riftGradV.addColorStop(1, 'rgba(56, 189, 248, 0.12)');
+      ctx.fillStyle = riftGradV;
+      ctx.fillRect(1770, 0, 60, 1760);
+
+      const riftGradH = ctx.createLinearGradient(0, 840, 0, 920);
+      riftGradH.addColorStop(0, 'rgba(56, 189, 248, 0.12)');
+      riftGradH.addColorStop(0.5, `rgba(56, 189, 248, ${0.45 + (chasmPulse / 20)})`);
+      riftGradH.addColorStop(1, 'rgba(56, 189, 248, 0.12)');
+      ctx.fillStyle = riftGradH;
+      ctx.fillRect(0, 850, 3600, 60);
+
+      // Central Crossroads Bridge
+      ctx.fillStyle = '#334155';
+      ctx.fillRect(1730, 810, 140, 140);
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 3;
+      ctx.strokeRect(1730, 810, 140, 140);
 
       // Draw Mineshaft Entrance Portals in the 4 Biomes
       dungeonPortals.forEach(dp => {
@@ -1161,21 +1485,34 @@ const App = (() => {
         ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
 
         ctx.restore();
+
+        // X-Ray Occlusion Highlight (Diablo & Don't Starve style: player silhouetted glow behind 3D structures)
+        if (playerY + 12 < obs.y + obs.h && playerX >= obs.x - 20 && playerX <= obs.x + obs.w + 20 && playerY >= obs.y - (obs.height || 60)) {
+          ctx.save();
+          ctx.globalAlpha = 0.60;
+          ctx.font = 'bold 24px Outfit';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#38bdf8';
+          ctx.shadowColor = '#0284c7';
+          ctx.shadowBlur = 14;
+          ctx.fillText('🧙‍♂️', playerX, playerY + bobY - playerZ + 8);
+          ctx.restore();
+        }
       });
 
-      // Central Core at (900, 440)
-      const pulse = 50 + Math.sin(Date.now() / 200) * 5;
-      const coreGrad = ctx.createRadialGradient(900, 440, 5, 900, 440, pulse);
+      // Central Core Obelisk Monument at (1800, 880)
+      const pulse = 55 + Math.sin(Date.now() / 200) * 5;
+      const coreGrad = ctx.createRadialGradient(1800, 880, 5, 1800, 880, pulse);
       coreGrad.addColorStop(0, '#ffffff');
       coreGrad.addColorStop(0.3, '#a855f7');
       coreGrad.addColorStop(1, 'transparent');
       ctx.fillStyle = coreGrad;
-      ctx.beginPath(); ctx.arc(900, 440, pulse, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(1800, 880, pulse, 0, Math.PI * 2); ctx.fill();
       
       ctx.fillStyle = '#f8fafc';
-      ctx.font = 'bold 12px Outfit';
+      ctx.font = 'bold 13px Outfit';
       ctx.textAlign = 'center';
-      ctx.fillText('⚡ Core', 900, 444);
+      ctx.fillText('⚡ Aether Core', 1800, 884);
 
     } else {
       // ----------------------------------------------------
@@ -1208,12 +1545,11 @@ const App = (() => {
       torches.forEach(t => {
         const tFlicker = Math.sin(Date.now() / 80 + t.x) * 4;
         const tGrad = ctx.createRadialGradient(t.x, t.y, 2, t.x, t.y, 45 + tFlicker);
-        tGrad.addColorStop(0, 'rgba(251, 146, 60, 0.6)');
-        tGrad.addColorStop(0.5, 'rgba(234, 88, 12, 0.25)');
+        tGrad.addColorStop(0, 'rgba(251, 146, 60, 0.5)');
+        tGrad.addColorStop(0.5, 'rgba(234, 88, 12, 0.2)');
         tGrad.addColorStop(1, 'transparent');
         ctx.fillStyle = tGrad;
         ctx.beginPath(); ctx.arc(t.x, t.y, 45 + tFlicker, 0, Math.PI * 2); ctx.fill();
-        ctx.font = '16px Outfit'; ctx.textAlign = 'center'; ctx.fillText('🔥', t.x, t.y + 5);
       });
 
       // Distinct Dungeon Title Banner
@@ -1262,7 +1598,7 @@ const App = (() => {
 
       // Check Exit Portal Collision (returns RIGHT OUTSIDE the entrance used!)
       const exDist = Math.hypot(playerX - 900, playerY - 440);
-      if (exDist < 36) {
+      if (exDist < 30) {
         inDungeon = false;
         playerX = surfaceReturnCoords.x;
         playerY = surfaceReturnCoords.y; // Teleports RIGHT OUTSIDE the exact entrance!
@@ -1270,6 +1606,111 @@ const App = (() => {
         initAdventureMinions();
         if (window.AudioEngine) window.AudioEngine.playSparkle();
       }
+
+      // Render & Process Subterranean Treasure Chests
+      activeDungeonChests.forEach(chest => {
+        const dist = Math.hypot(playerX - chest.x, playerY - chest.y);
+        ctx.save();
+        ctx.translate(chest.x, chest.y);
+
+        // Ground Drop Shadow
+        ctx.fillStyle = 'rgba(2, 6, 23, 0.6)';
+        ctx.beginPath();
+        ctx.ellipse(0, 14, 18, 8, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        if (!chest.opened) {
+          // Unopened Glowing Gold Treasure Chest
+          const pulse = Math.sin(Date.now() / 180 + chest.x) * 3;
+          const cGlow = ctx.createRadialGradient(0, 0, 4, 0, 0, 26 + pulse);
+          cGlow.addColorStop(0, 'rgba(251, 191, 36, 0.55)');
+          cGlow.addColorStop(1, 'transparent');
+          ctx.fillStyle = cGlow;
+          ctx.beginPath(); ctx.arc(0, 0, 26 + pulse, 0, Math.PI * 2); ctx.fill();
+
+          // Render Higgsfield 3D Closed Treasure Chest Sprite!
+          const cImg = chestSprites.closed;
+          if (cImg && (cImg.complete || cImg.src)) {
+            const tImg = getTransparentSprite(cImg);
+            if (tImg) {
+              ctx.save();
+              ctx.beginPath();
+              ctx.arc(0, -2, 20, 0, Math.PI * 2);
+              ctx.clip();
+              ctx.drawImage(tImg, -20, -22, 40, 40);
+              ctx.restore();
+            } else {
+              ctx.font = '26px Outfit'; ctx.textAlign = 'center'; ctx.fillText('🎁', 0, 6);
+            }
+          } else {
+            ctx.font = '26px Outfit'; ctx.textAlign = 'center'; ctx.fillText('🎁', 0, 6);
+          }
+
+          // Nearby Tooltip
+          if (dist < 45) {
+            ctx.fillStyle = '#fbbf24';
+            ctx.font = 'bold 10px Outfit';
+            ctx.fillText('✨ Touch to Open Chest (2-20 Coins + Items)', 0, -22);
+          }
+
+          // Open Collision
+          if (dist < 28) {
+            chest.opened = true;
+
+            // Save opened chests state
+            try {
+              let savedState = {};
+              const saved = localStorage.getItem('knowledge_quest_chests');
+              if (saved) savedState = JSON.parse(saved);
+              savedState[chest.id] = true;
+              localStorage.setItem('knowledge_quest_chests', JSON.stringify(savedState));
+            } catch (e) {}
+
+            // Reward: 2-20 Gold Coins
+            const goldCoins = Math.floor(Math.random() * 19) + 2;
+            player.gold += goldCoins;
+
+            // 35% Chance to Drop an Item
+            const itemPool = ['potion_hp', 'potion_mp', 'wand_apprentice', 'staff_archmage', 'robe_aether', 'ring_quantum'];
+            let bonusItem = null;
+            if (Math.random() < 0.35) {
+              bonusItem = itemPool[Math.floor(Math.random() * itemPool.length)];
+              player.inventory.push(bonusItem);
+            }
+
+            if (window.AudioEngine) {
+              window.AudioEngine.playSparkle();
+              window.AudioEngine.playCoin();
+            }
+
+            saveState();
+            updateHUD();
+            if (window.DashboardEngine) window.DashboardEngine.updateDashboardUI();
+            showChestLootModal(goldCoins, bonusItem);
+          }
+        } else {
+          // Render Higgsfield 3D Opened Treasure Chest Sprite!
+          const oImg = chestSprites.open;
+          if (oImg && (oImg.complete || oImg.src)) {
+            const tImg = getTransparentSprite(oImg);
+            if (tImg) {
+              ctx.save();
+              ctx.globalAlpha = 0.65;
+              ctx.beginPath();
+              ctx.arc(0, -2, 18, 0, Math.PI * 2);
+              ctx.clip();
+              ctx.drawImage(tImg, -18, -20, 36, 36);
+              ctx.restore();
+            } else {
+              ctx.font = '22px Outfit'; ctx.textAlign = 'center'; ctx.globalAlpha = 0.55; ctx.fillText('📭', 0, 6);
+            }
+          } else {
+            ctx.font = '22px Outfit'; ctx.textAlign = 'center'; ctx.globalAlpha = 0.55; ctx.fillText('📭', 0, 6);
+          }
+        }
+
+        ctx.restore();
+      });
     }
 
     // Draw particle sparkles
@@ -1331,6 +1772,10 @@ const App = (() => {
       // Draw Minions with 2-Frame Stepping Walk Animations (Transparent PNG, No Box, No Feet)
       minions.forEach((m, idx) => {
         if (!m.active) return;
+        if (!inDungeon && player.defeatedBosses && player.defeatedBosses[m.subject]) {
+          m.active = false;
+          return;
+        }
 
         const walkFrame = Math.floor((Date.now() + idx * 200) / 140) % 2;
         const mBobY = Math.sin(Date.now() / 110 + idx * 1.5) * 3.5;
@@ -1356,22 +1801,36 @@ const App = (() => {
           ctx.fillText(m.emoji, 0, 6);
         }
 
+        if (m.isSpecial) {
+          ctx.save();
+          const starPulse = Math.sin(Date.now() / 150 + m.x) * 2;
+          ctx.font = 'bold 12px Outfit';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#fbbf24';
+          ctx.shadowColor = '#f59e0b';
+          ctx.shadowBlur = 8;
+          ctx.fillText('⭐', 14, -14 + starPulse);
+          ctx.restore();
+        }
+
         ctx.restore();
       });
     }
 
     // Player 2-Frame Stepping Walk Animation with Directional Mirroring (Left vs Right)
-    const pWalkFrame = Math.floor(Date.now() / 130) % 2;
-    let bobY = 0;
+    // (bobY and pWalkFrame are calculated at top of updateMapFrame)
 
-    if (isMoving) {
-      bobY = pWalkFrame === 0 ? -3 : 3;
-    } else {
-      bobY = Math.sin(Date.now() / 400) * 1.0;
-    }
+    // Player Ground Floor Drop Shadow & Sprite
+    ctx.save();
+    const shadowScale = Math.max(0.4, 1 - (playerZ / 100));
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.55)';
+    ctx.beginPath();
+    ctx.ellipse(playerX, playerY + 18, 16 * shadowScale, 6 * shadowScale, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
 
     ctx.save();
-    ctx.translate(playerX, playerY + bobY);
+    ctx.translate(playerX, playerY + bobY - playerZ);
 
     // Directional Mirroring: Flip horizontally when facing Left so character faces left cleanly!
     if (player.facing === 'left') {
@@ -1501,8 +1960,13 @@ const App = (() => {
     ctx.fillStyle = '#94a3b8';
     ctx.font = 'bold 8px Outfit';
     ctx.textAlign = 'left';
-    ctx.fillText('📡 RADAR MAP', mmX + 6, mmY + 11);
     ctx.restore();
+
+    // 3D WebGL Engine Synchronization & Render Loop
+    if (window.World3DEngine) {
+      window.World3DEngine.updatePlayer(playerX, playerY, playerZ, player.facing);
+      window.World3DEngine.render();
+    }
   };
 
   const triggerStoryIntro = () => {
@@ -1541,8 +2005,13 @@ const App = (() => {
     }
 
     // Obsidian Golem Ally Fortress Armor Buff (+40 Max HP)
-    if (player.activePet && player.activePet.name === 'Obsidian Golem') {
+    if (player.activePet && (player.activePet.name === 'Obsidian Golem' || (player.activePet.name && player.activePet.name.includes('Obsidian Golem')))) {
       baseHp += 40;
+    }
+
+    // Special Dungeon Monster Active Companion Buff: +10% Max Player Health!
+    if (player.activePet && (player.activePet.isSpecial || (player.activePet.name && player.activePet.name.includes('⭐')))) {
+      baseHp = Math.round(baseHp * 1.10);
     }
 
     player.hpMax = baseHp;
@@ -1601,9 +2070,18 @@ const App = (() => {
     } else if (screenId === 'allies') {
       stopMapLoop();
       renderAlliesList();
+    } else if (screenId === 'pvp') {
+      stopMapLoop();
+      if (window.PVPEngine && window.PVPEngine.init) {
+        window.PVPEngine.init();
+      }
     } else if (screenId === 'lab') {
       stopMapLoop();
-      renderMagicTrainingUI('chem');
+      if (window.TrainingEngine) {
+        window.TrainingEngine.renderTrainingScreen();
+      } else {
+        renderMagicTrainingUI('chem');
+      }
     } else if (screenId === 'map') {
       startMapLoop();
       updateMapProgression();
@@ -1906,20 +2384,27 @@ const App = (() => {
       }
 
       let buffText = petBuffDescriptions[pet.element] || "✨ Minor Combat Assist";
-      if (pet.name === 'Obsidian Golem') {
+      if (pet.name.includes('Obsidian Golem')) {
         buffText = "🗿 Fortress Armor: +40 Max HP & Takes 25% Less Damage!";
-      } else if (pet.name === 'Nether Hydra') {
+      } else if (pet.name.includes('Nether Hydra')) {
         buffText = "🐍 Corrosive Venom: +20 Acid Damage & Heals 15% Damage!";
       }
+
+      const isSpecialPet = pet.isSpecial || pet.name.includes('⭐');
+      if (isSpecialPet) {
+        buffText += "<br><span style='color: #fbbf24; font-weight: 700;'>⭐ Special Buff: +10% Max Player HP!</span>";
+      }
+
       const petSpriteSrc = getPetSpriteSrc(pet);
 
       card.innerHTML = `
-        <div style="width: 54px; height: 54px; border-radius: 50%; overflow: hidden; margin: 0 auto 8px; border: 2px solid ${isActive ? '#4ade80' : 'rgba(255,255,255,0.2)'}; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
+        <div style="position: relative; width: 54px; height: 54px; border-radius: 50%; overflow: hidden; margin: 0 auto 8px; border: 2px solid ${isActive ? '#4ade80' : 'rgba(255,255,255,0.2)'}; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
           <img src="${petSpriteSrc}" alt="${pet.name}" style="width: 100%; height: 100%; object-fit: cover;">
+          ${isSpecialPet ? `<span style="position: absolute; top: 0; right: 0; font-size: 0.9rem; filter: drop-shadow(0 0 6px #fbbf24);">⭐</span>` : ''}
         </div>
         <span class="pet-name-txt">${pet.emoji || '🐾'} ${pet.name}</span>
         <span class="pet-level-txt">Lv. ${pet.level} ${pet.element.toUpperCase()}</span>
-        <div style="font-size: 0.76rem; color: ${isActive ? '#4ade80' : '#cbd5e1'}; margin: 6px 0; text-align: center; font-weight: 600; background: rgba(15, 23, 42, 0.6); padding: 4px 6px; border-radius: 6px;">
+        <div style="font-size: 0.76rem; color: ${isActive ? '#4ade80' : '#cbd5e1'}; margin: 6px 0; text-align: center; font-weight: 600; background: rgba(15, 23, 42, 0.6); padding: 4px 6px; border-radius: 6px; line-height: 1.4;">
           ${buffText}
         </div>
         <button class="cta-btn ${isActive ? 'secondary' : 'primary'} small" style="width: 100%; margin-top: 4px; font-size: 0.8rem; padding: 6px 12px;">
@@ -1937,6 +2422,9 @@ const App = (() => {
           player.activePet = pet;
         }
         
+        recalculateStats();
+        player.hp = player.hpMax; // Refill HP when activating health-granting allies!
+        player.mp = player.mpMax;
         saveState();
         renderAlliesList();
         updateHUD();
@@ -1996,6 +2484,25 @@ const App = (() => {
   };
 
   const updateHUD = () => {
+    recalculateStats();
+
+    // Sync battle stats HUD elements if present
+    const battleHpBar = document.getElementById('battle-player-hp-bar');
+    const battleHpText = document.getElementById('battle-player-hp-text');
+    const battleMpBar = document.getElementById('battle-player-mp-bar');
+    const battleMpText = document.getElementById('battle-player-mp-text');
+
+    if (battleHpBar && battleHpText) {
+      const hpPct = Math.max(0, Math.min(100, (player.hp / player.hpMax) * 100));
+      battleHpBar.style.width = `${hpPct}%`;
+      battleHpText.innerText = `${player.hp}/${player.hpMax}`;
+    }
+    if (battleMpBar && battleMpText) {
+      const mpPct = Math.max(0, Math.min(100, (player.mp / player.mpMax) * 100));
+      battleMpBar.style.width = `${mpPct}%`;
+      battleMpText.innerText = `${player.mp}/${player.mpMax}`;
+    }
+
     const profileSrc = avatarProfileMap[player.avatar] || 'assets/profile_boy.jpg';
     
     const hudAv = document.getElementById('hud-avatar');

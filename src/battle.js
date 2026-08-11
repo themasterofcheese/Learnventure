@@ -17,6 +17,153 @@ const BattleEngine = (() => {
   let isCaptureAttempt = false;
   let isQuickThink = false;
 
+  // Status Effects Arrays
+  let playerStatusEffects = [];
+  let enemyStatusEffects = [];
+
+  const renderStatusChips = () => {
+    const pContainer = document.getElementById('player-status-chips');
+    const eContainer = document.getElementById('enemy-status-chips');
+    
+    if (pContainer) {
+      pContainer.innerHTML = playerStatusEffects.map(s => `
+        <div class="status-chip ${s.type}" title="${s.name}: ${s.duration} turns left">
+          ${s.icon} ${s.duration}t
+        </div>
+      `).join('');
+    }
+
+    if (eContainer) {
+      eContainer.innerHTML = enemyStatusEffects.map(s => `
+        <div class="status-chip ${s.type}" title="${s.name}: ${s.duration} turns left">
+          ${s.icon} ${s.duration}t
+        </div>
+      `).join('');
+    }
+
+    // Apply visual aura classes on sprite containers
+    const pSpriteBox = document.getElementById('player-sprite-box') || document.querySelector('#combatant-player .sprite-container');
+    const eSpriteBox = document.getElementById('enemy-sprite-box') || document.querySelector('#combatant-enemy .sprite-container');
+
+    if (pSpriteBox) {
+      pSpriteBox.classList.toggle('has-poison', playerStatusEffects.some(s => s.type === 'poison'));
+      pSpriteBox.classList.toggle('has-burn', playerStatusEffects.some(s => s.type === 'burn'));
+      pSpriteBox.classList.toggle('has-stun', playerStatusEffects.some(s => s.type === 'stun'));
+      pSpriteBox.classList.toggle('has-freeze', playerStatusEffects.some(s => s.type === 'freeze'));
+    }
+
+    if (eSpriteBox) {
+      eSpriteBox.classList.toggle('has-poison', enemyStatusEffects.some(s => s.type === 'poison'));
+      eSpriteBox.classList.toggle('has-burn', enemyStatusEffects.some(s => s.type === 'burn'));
+      eSpriteBox.classList.toggle('has-stun', enemyStatusEffects.some(s => s.type === 'stun'));
+      eSpriteBox.classList.toggle('has-freeze', enemyStatusEffects.some(s => s.type === 'freeze'));
+    }
+  };
+
+  const applyStatusEffect = (target, effectType, duration = 2) => {
+    const list = target === 'player' ? playerStatusEffects : enemyStatusEffects;
+    const targetName = target === 'player' ? player.name : enemy.name;
+
+    const effectMap = {
+      poison: { type: 'poison', icon: '🐍', name: 'Toxic Poison', duration: duration || 3, color: '#22c55e' },
+      burn: { type: 'burn', icon: '🔥', name: 'Burn Flame', duration: duration || 2, color: '#fb923c' },
+      stun: { type: 'stun', icon: '⚡', name: 'Stun Paralyze', duration: duration || 1, color: '#facc15' },
+      freeze: { type: 'freeze', icon: '❄️', name: 'Frost Freeze', duration: duration || 2, color: '#38bdf8' }
+    };
+
+    const newEffect = effectMap[effectType];
+    if (!newEffect) return;
+
+    const existing = list.find(e => e.type === effectType);
+    if (existing) {
+      existing.duration = Math.max(existing.duration, newEffect.duration);
+    } else {
+      list.push({ ...newEffect });
+    }
+
+    renderStatusChips();
+
+    const announceText = target === 'player'
+      ? `⚠️ WARNING! You are afflicted with ${newEffect.icon} ${newEffect.name}!`
+      : `✨ STATUS! ${enemy.name} is afflicted with ${newEffect.icon} ${newEffect.name}!`;
+
+    document.getElementById('battle-announcer').innerText = announceText;
+    if (window.AudioEngine) window.AudioEngine.playSparkle();
+  };
+
+  const processStatusTick = (target, callback) => {
+    const list = target === 'player' ? playerStatusEffects : enemyStatusEffects;
+    if (!list || list.length === 0) {
+      if (callback) callback(false);
+      return false;
+    }
+
+    let totalDmg = 0;
+    let tickMessages = [];
+
+    for (let i = list.length - 1; i >= 0; i--) {
+      const s = list[i];
+      if (s.type === 'poison') {
+        const hpMax = target === 'player' ? player.hpMax : enemy.hpMax;
+        const poisonDmg = Math.max(5, Math.round(hpMax * 0.08));
+        totalDmg += poisonDmg;
+        tickMessages.push(`-${poisonDmg} 🐍 POISON`);
+      } else if (s.type === 'burn') {
+        const hpMax = target === 'player' ? player.hpMax : enemy.hpMax;
+        const burnDmg = Math.max(6, Math.round(hpMax * 0.10));
+        totalDmg += burnDmg;
+        tickMessages.push(`-${burnDmg} 🔥 BURN`);
+      }
+
+      s.duration--;
+      if (s.duration <= 0) {
+        list.splice(i, 1);
+      }
+    }
+
+    renderStatusChips();
+
+    if (totalDmg > 0) {
+      const targetName = target === 'player' ? player.name : enemy.name;
+      if (target === 'player') {
+        player.hp = Math.max(0, player.hp - totalDmg);
+        updateHPBar('player', player.hp, player.hpMax);
+        showDamageFlyout(`-${totalDmg} ☣️`, 'player', 'chem');
+      } else {
+        enemy.hp = Math.max(0, enemy.hp - totalDmg);
+        updateHPBar('enemy', enemy.hp, enemy.hpMax);
+        showDamageFlyout(`-${totalDmg} ☣️`, 'enemy', 'chem');
+      }
+
+      document.getElementById('battle-announcer').innerText = `☣️ ${targetName} suffers ${totalDmg} Status Damage (${tickMessages.join(', ')})!`;
+
+      if (window.AudioEngine) window.AudioEngine.playImpact();
+      const comp = document.getElementById(target === 'player' ? 'combatant-player' : 'combatant-enemy');
+      if (comp) {
+        comp.classList.add('hit');
+        setTimeout(() => comp.classList.remove('hit'), 400);
+      }
+
+      const isDefeated = (target === 'player' ? player.hp <= 0 : enemy.hp <= 0);
+      if (callback) {
+        setTimeout(() => callback(isDefeated), 800);
+      }
+      return isDefeated;
+    } else {
+      if (callback) callback(false);
+      return false;
+    }
+  };
+
+  const cleanseStatusEffects = (target = 'player') => {
+    if (target === 'player') {
+      playerStatusEffects = [];
+    } else {
+      enemyStatusEffects = [];
+    }
+    renderStatusChips();
+  };
+
   // Preload Biome Background Images for Cinematic Spell Animation
   const biomeBgImages = {
     math: new Image(),
@@ -53,56 +200,69 @@ const BattleEngine = (() => {
     ]
   };
 
-  // Boss SVG data
+  // Boss Data mapped directly to Intro Cutscene Videos & Subject Biomes
   const bossData = {
-    math: { name: "Titan of Equations", hpMax: 200, emoji: "🔱", draw: (g) => drawMathBoss(g) },
-    bio: { name: "DNA Sentinel", hpMax: 220, emoji: "🧬", draw: (g) => drawBioBoss(g) },
-    chem: { name: "Valence Overlord", hpMax: 240, emoji: "🪐", draw: (g) => drawChemBoss(g) },
-    phys: { name: "Quantum Singularity", hpMax: 250, emoji: "⚛️", draw: (g) => drawPhysBoss(g) }
+    math: { name: "Titan of Equations", hpMax: 220, emoji: "🔱", element: "water", draw: (g) => drawMathBoss(g) },
+    chem: { name: "Valence Overlord", hpMax: 240, emoji: "🪐", element: "fire", draw: (g) => drawChemBoss(g) },
+    bio: { name: "DNA Sentinel", hpMax: 250, emoji: "🧬", element: "earth", draw: (g) => drawBioBoss(g) },
+    phys: { name: "Quantum Singularity", hpMax: 260, emoji: "⚛️", element: "air", draw: (g) => drawPhysBoss(g) }
   };
 
   // Base Spells library
+  // Stage 1 & 2 spells — always available
   const baseSpells = {
     fire: [
-      { name: "Ignite Sparks", element: "fire", cost: 0, power: 15, prompt: "A flurry of glowing flame sparks dancing around the target, digital anime style" },
-      { name: "Combustion Wave", element: "fire", cost: 15, power: 30, prompt: "A rolling wave of intense thermonuclear heat blasting across a volcanic valley, cinematic CGI" },
-      { name: "Plasma Burst", element: "fire", cost: 25, power: 50, prompt: "A highly concentrated beam of superheated purple plasma splitting the ground, dark fantasy realistic" }
+      { name: "Ignite Sparks",   element: "fire",  cost: 0,  power: 15, prompt: "A flurry of glowing flame sparks dancing around the target, digital anime style" },
+      { name: "Combustion Wave", element: "fire",  cost: 15, power: 30, prompt: "A rolling wave of intense thermonuclear heat blasting across a volcanic valley, cinematic CGI" }
     ],
     water: [
-      { name: "Aqua Splash", element: "water", cost: 0, power: 15, prompt: "A tight jet of pressurized blue water splashing onto the enemy, cartoon anime" },
-      { name: "Tidal Current", element: "water", cost: 15, power: 30, prompt: "A massive spiral vortex of ocean water crashing down from above, drone pan shot, 4k" },
-      { name: "Hydro Nova", element: "water", cost: 30, power: 55, prompt: "An explosive shockwave of frozen ice crystal shards bursting in slow motion, macro cinematic CGI" }
+      { name: "Aqua Splash",   element: "water", cost: 0,  power: 15, prompt: "A tight jet of pressurized blue water splashing onto the enemy, cartoon anime" },
+      { name: "Tidal Current", element: "water", cost: 15, power: 30, prompt: "A massive spiral vortex of ocean water crashing down from above, drone pan shot, 4k" }
     ],
     earth: [
-      { name: "Foliage Strike", element: "earth", cost: 0, power: 15, prompt: "Sharp razor leaves spinning like gears toward the enemy, vibrant 2d animation" },
-      { name: "Tectonic Spike", element: "earth", cost: 15, power: 32, prompt: "An ancient stone spire erupting violently from a grassy meadow, extreme camera shake" },
-      { name: "Crystal Rain", element: "earth", cost: 25, power: 48, prompt: "A cascade of sharp glowing emerald crystals raining down like stars, cinematic dark fantasy" }
+      { name: "Foliage Strike",  element: "earth", cost: 0,  power: 15, prompt: "Sharp razor leaves spinning like gears toward the enemy, vibrant 2d animation" },
+      { name: "Tectonic Spike",  element: "earth", cost: 15, power: 32, prompt: "An ancient stone spire erupting violently from a grassy meadow, extreme camera shake" }
     ],
     air: [
-      { name: "Wind Gust", element: "air", cost: 0, power: 15, prompt: "A howling spiral wind current tossing dust into the camera, extreme motion blur" },
-      { name: "Volt Shock", element: "air", cost: 12, power: 28, prompt: "Forked purple electrical arcs crackling from a storm cloud, realistic lightning simulation" },
-      { name: "Galvanic Cyclone", element: "air", cost: 25, power: 52, prompt: "A swirling vortex of cyan electricity and thunder clouds crushing the battlefield, aerial orbit drone shot" }
+      { name: "Wind Gust",  element: "air", cost: 0,  power: 15, prompt: "A howling spiral wind current tossing dust into the camera, extreme motion blur" },
+      { name: "Volt Shock", element: "air", cost: 12, power: 28, prompt: "Forked purple electrical arcs crackling from a storm cloud, realistic lightning simulation" }
     ]
   };
 
-  const initBattle = (playerState, subject, isBoss = false, targetEnemyName = null) => {
+  // Stage 3 & 4 spells — unlocked via Magic Training tests (80%+ score)
+  const advancedSpells = [
+    { spellId: 'ignis_inferno',   name: "Ignis Inferno",    element: "fire",  cost: 20, power: 35, statusInflict: "burn",   prompt: "An intense swirling column of roaring flames enveloping the target in incinerating heat, cinematic CGI fire" },
+    { spellId: 'plasma_burst',   name: "Plasma Burst",     element: "fire",  cost: 25, power: 50, prompt: "A highly concentrated beam of superheated purple plasma splitting the ground, dark fantasy realistic" },
+    { spellId: 'glacial_glaze',  name: "Glacial Glaze",    element: "water", cost: 20, power: 35, statusInflict: "freeze", prompt: "A flash freeze blizzard encasing the target in a jagged ice glacier, macro 4k realistic frost simulation" },
+    { spellId: 'hydro_nova',     name: "Hydro Nova",       element: "water", cost: 30, power: 55, prompt: "An explosive shockwave of frozen ice crystal shards bursting in slow motion, macro cinematic CGI" },
+    { spellId: 'venomous_vortex',name: "Venomous Vortex",  element: "earth", cost: 20, power: 35, statusInflict: "poison", prompt: "A swirling cloud of glowing toxic emerald green venomous gas dissolving the ground beneath the target, dark fantasy art" },
+    { spellId: 'crystal_rain',   name: "Crystal Rain",     element: "earth", cost: 25, power: 48, prompt: "A cascade of sharp glowing emerald crystals raining down like stars, cinematic dark fantasy" },
+    { spellId: 'thunder_tempest',name: "Thunder Tempest",  element: "air",   cost: 22, power: 35, statusInflict: "stun",   prompt: "A terrifying lightning bolt striking directly from dark storm clouds, blinding electric flash and thunder rumble" },
+    { spellId: 'galvanic_cyclone',name: "Galvanic Cyclone",element: "air",   cost: 25, power: 52, prompt: "A swirling vortex of cyan electricity and thunder clouds crushing the battlefield, aerial orbit drone shot" }
+  ];
+
+  const initBattle = (playerState, subject, isBoss = false, targetEnemyName = null, isSpecial = false) => {
     player = playerState;
     realmSubject = subject;
     activeSubject = subject;
-    isCaptureAttempt = false;
-    isBossBattle = isBoss;
+    isBossBattle = !!isBoss;
+    playerStatusEffects = [];
+    enemyStatusEffects = [];
+    renderStatusChips();
+
+    if (window.App && window.App.recalculateStats) {
+      window.App.recalculateStats();
+    }
 
     const banner = document.getElementById('battle-type-banner');
     const svgEl = document.getElementById('enemy-monster-svg');
     if (svgEl) svgEl.innerHTML = '';
 
-    // Load backgrounds dynamically based on Boss state
+    // Load dynamic Boss background artwork for all 4 bosses!
     const battleLayout = document.querySelector('.battle-layout');
     if (battleLayout) {
-      if (isBossBattle && subject === 'math') {
-        battleLayout.style.backgroundImage = "url('assets/boss_math.jpg')";
-      } else if (isBossBattle && subject === 'chem') {
-        battleLayout.style.backgroundImage = "url('assets/boss_chem.jpg')";
+      if (isBossBattle) {
+        battleLayout.style.backgroundImage = `url('assets/boss_${subject}.jpg')`;
       } else {
         battleLayout.style.backgroundImage = "url('assets/battle_arena_bg.jpg')";
       }
@@ -135,26 +295,29 @@ const BattleEngine = (() => {
     if (pSprite) pSprite.src = profileSrc;
 
     if (isBossBattle) {
-      const boss = bossData[subject];
+      const boss = bossData[subject] || bossData.math;
       const eLevel = player.level + 2;
-      const hpMaxScaled = boss.hpMax + (eLevel * 20);
+      const hpMaxScaled = boss.hpMax + (eLevel * 22);
       
       enemy = {
         name: boss.name,
+        rawName: boss.name,
         level: eLevel,
         hpMax: hpMaxScaled,
         hp: hpMaxScaled,
         emoji: boss.emoji,
-        isBoss: true
+        element: boss.element,
+        isBoss: true,
+        isSpecial: false
       };
 
       if (banner) {
-        banner.innerText = "BOSS BATTLE";
+        banner.innerText = "💥 LEGENDARY BOSS BATTLE 💥";
         banner.className = "battle-banner-type boss";
       }
       if (svgEl) boss.draw(svgEl);
       const announcer = document.getElementById('battle-announcer');
-      if (announcer) announcer.innerText = `WARNING: The corrupted ${enemy.name} (Lv. ${enemy.level}) stands in your path!`;
+      if (announcer) announcer.innerText = `⚠️ LEGENDARY BOSS ENCOUNTER! The ${enemy.name} (Lv. ${enemy.level}) materializes!`;
     } else {
       const allMinions = [
         ...minionData.math,
@@ -172,27 +335,55 @@ const BattleEngine = (() => {
       }
 
       const eLevel = Math.max(1, player.level + template.levelOffset + Math.floor(Math.random() * 2) - 1);
-      const hpMaxScaled = template.hpMax + (eLevel * 12);
+      let hpMaxScaled = template.hpMax + (eLevel * 12);
       
+      if (isSpecial) {
+        hpMaxScaled = Math.round(hpMaxScaled * 1.10); // +10% Health for Lucky Special Monster!
+      }
+
       enemy = {
-        name: template.name,
+        name: isSpecial ? `⭐ Special ${template.name}` : template.name,
+        rawName: template.name,
         level: eLevel,
         hpMax: hpMaxScaled,
         hp: hpMaxScaled,
         emoji: template.emoji,
-        isBoss: false
+        isBoss: false,
+        isSpecial: isSpecial
       };
 
       if (banner) {
-        banner.innerText = "MINION BATTLE";
-        banner.className = "battle-banner-type minion";
+        if (isSpecial) {
+          banner.innerText = "⭐ SPECIAL DUNGEON MONSTER ⭐";
+          banner.className = "battle-banner-type boss";
+        } else {
+          banner.innerText = "MINION BATTLE";
+          banner.className = "battle-banner-type minion";
+        }
       }
       if (svgEl) template.draw(svgEl);
       const announcer = document.getElementById('battle-announcer');
-      if (announcer) announcer.innerText = `A wild ${enemy.name} (Lv. ${enemy.level}) appears!`;
+      if (announcer) announcer.innerText = isSpecial ? `LUCKY! A ⭐ Special ${template.name} (Lv. ${enemy.level}) with +10% HP appears!` : `A wild ${enemy.name} (Lv. ${enemy.level}) appears!`;
     }
 
-    // Set high-quality enemy sprite image
+    // Set high-quality enemy sprite image & Star Badge
+    const enemySpriteBox = document.getElementById('enemy-sprite-box');
+    if (enemySpriteBox) {
+      let starBadge = document.getElementById('enemy-special-star');
+      if (enemy.isSpecial) {
+        if (!starBadge) {
+          starBadge = document.createElement('div');
+          starBadge.id = 'enemy-special-star';
+          starBadge.style.cssText = 'position: absolute; top: -10px; right: -10px; font-size: 1.8rem; filter: drop-shadow(0 0 10px #fbbf24); animation: pulseGlow 1.5s infinite alternate; z-index: 10;';
+          starBadge.innerText = '⭐';
+          enemySpriteBox.appendChild(starBadge);
+        }
+        starBadge.classList.remove('hidden');
+      } else if (starBadge) {
+        starBadge.classList.add('hidden');
+      }
+    }
+
     const enemySprite = document.getElementById('enemy-sprite-img');
     if (enemySprite) {
       if (svgEl) svgEl.innerHTML = ''; // Clear SVG vector layer so image sprite is 100% visible
@@ -211,7 +402,8 @@ const BattleEngine = (() => {
           "Obsidian Golem": "assets/minion_dungeon_golem.jpg",
           "Nether Hydra": "assets/minion_dungeon_hydra.jpg"
         };
-        enemySprite.src = minionImageMap[enemy.name] || `assets/minion_${subject}.jpg`;
+        const searchName = enemy.rawName || enemy.name;
+        enemySprite.src = minionImageMap[searchName] || `assets/minion_${subject}.jpg`;
       }
     }
     
@@ -289,29 +481,53 @@ const BattleEngine = (() => {
   };
 
   const resetActionPanel = () => {
-    document.getElementById('battle-deck').classList.add('hidden');
-    document.getElementById('battle-items').classList.add('hidden');
-    document.getElementById('question-card').classList.add('hidden');
-    document.getElementById('explanation-panel').classList.add('hidden');
+    // Process status tick for player at start of turn
+    processStatusTick('player', (defeated) => {
+      if (defeated) {
+        handleDefeat();
+        return;
+      }
 
-    const choiceRow = document.getElementById('battle-action-bar');
-    choiceRow.classList.remove('hidden');
+      // Check if player is STUNNED
+      const stunIdx = playerStatusEffects.findIndex(s => s.type === 'stun');
+      if (stunIdx !== -1) {
+        playerStatusEffects.splice(stunIdx, 1);
+        renderStatusChips();
+        document.getElementById('battle-announcer').innerText = `⚡ YOU ARE STUNNED! Your turn is skipped!`;
+        if (window.AudioEngine) window.AudioEngine.playIncorrect();
 
-    // Show capture option if enemy health < 50% AND not a boss
-    const capBtn = document.getElementById('action-capture-pet');
-    const hpPct = (enemy.hp / enemy.hpMax) * 100;
-    if (hpPct < 50 && !enemy.isBoss) {
-      capBtn.classList.remove('hidden');
-    } else {
-      capBtn.classList.add('hidden');
-    }
+        setTimeout(() => {
+          executeEnemyAttack();
+        }, 1400);
+        return;
+      }
+
+      document.getElementById('battle-deck').classList.add('hidden');
+      document.getElementById('battle-items').classList.add('hidden');
+      document.getElementById('question-card').classList.add('hidden');
+      document.getElementById('explanation-panel').classList.add('hidden');
+
+      const choiceRow = document.getElementById('battle-action-bar');
+      choiceRow.classList.remove('hidden');
+
+      // Show capture option if enemy health <= 50% (or <= 25% for Special monsters) AND not a boss
+      const capBtn = document.getElementById('action-capture-pet');
+      const hpPct = (enemy.hp / enemy.hpMax) * 100;
+      const thresholdPct = enemy.isSpecial ? 25 : 50;
+
+      if (hpPct <= thresholdPct && !enemy.isBoss) {
+        capBtn.classList.remove('hidden');
+      } else {
+        capBtn.classList.add('hidden');
+      }
+    });
   };
 
   const renderPetSidekick = () => {
     const frame = document.getElementById('battle-pet-container');
     if (player.activePet) {
       frame.classList.remove('hidden');
-      const petSrc = player.activePet.element === 'fire' || player.activePet.element === 'chem' ? 'assets/minion_chem.jpg' : player.activePet.element === 'water' || player.activePet.element === 'math' ? 'assets/minion_math.jpg' : player.activePet.element === 'earth' || player.activePet.element === 'bio' ? 'assets/minion_bio.jpg' : 'assets/minion_phys.jpg';
+      const petSrc = player.activePet.sprite ? player.activePet.sprite : (player.activePet.element === 'fire' || player.activePet.element === 'chem' ? 'assets/minion_chem.jpg' : player.activePet.element === 'water' || player.activePet.element === 'math' ? 'assets/minion_math.jpg' : player.activePet.element === 'earth' || player.activePet.element === 'bio' ? 'assets/minion_bio.jpg' : 'assets/minion_phys.jpg');
       const petImgEl = document.getElementById('battle-pet-img');
       if (petImgEl) {
         petImgEl.src = petSrc;
@@ -342,12 +558,17 @@ const BattleEngine = (() => {
 
     if (itemId === 'potion_hp') {
       player.hp = Math.min(player.hpMax, player.hp + 50);
-      showDamageFlyout("+50", 'player', 'water'); // Green floating heal
+      showDamageFlyout("+50 HP", 'player', 'water');
       if (window.AudioEngine) window.AudioEngine.playCorrect();
     } else {
       player.mp = Math.min(player.mpMax, player.mp + 25);
       showDamageFlyout("+25 MP", 'player', 'water');
       if (window.AudioEngine) window.AudioEngine.playCorrect();
+    }
+
+    if (playerStatusEffects.length > 0) {
+      cleanseStatusEffects('player');
+      document.getElementById('battle-announcer').innerText = "✨ Elixir cleansed all negative status effects!";
     }
 
     window.App.saveState();
@@ -370,25 +591,26 @@ const BattleEngine = (() => {
   const renderSpellDeck = () => {
     const container = document.getElementById('spells-container');
     container.innerHTML = '';
-    
-    // Load spells from ALL elements so the player has choices!
+
+    // Stage 1 & 2 base spells — always available
     let spells = [];
-    const elementsList = ['fire', 'water', 'earth', 'air'];
-    elementsList.forEach(el => {
+    ['fire', 'water', 'earth', 'air'].forEach(el => {
       spells = spells.concat(baseSpells[el]);
     });
-    
-    // Add custom spells
+
+    // Stage 3 & 4 advanced spells — only if unlocked via Magic Training
+    if (window.TrainingEngine) {
+      advancedSpells.forEach(sp => {
+        if (window.TrainingEngine.isUnlocked(sp.spellId)) {
+          spells.push(sp);
+        }
+      });
+    }
+
+    // Add custom spells from Magic Lab
     if (player.customSpells && player.customSpells.length > 0) {
       player.customSpells.forEach(csp => {
-        spells.push({
-          name: csp.name,
-          element: csp.element,
-          cost: csp.cost,
-          power: csp.power,
-          prompt: csp.prompt,
-          isCustom: true
-        });
+        spells.push({ name: csp.name, element: csp.element, cost: csp.cost, power: csp.power, prompt: csp.prompt, isCustom: true });
       });
     }
 
@@ -397,26 +619,42 @@ const BattleEngine = (() => {
     if (player.equipped.staff === 'wand_apprentice') extraPower = 5;
     if (player.equipped.staff === 'staff_archmage') extraPower = 15;
 
+    const statusBadgeMap = {
+      burn:   '<span class="status-chip burn"   style="font-size:0.65rem;padding:1px 5px;margin-left:4px;">🔥 Burn</span>',
+      freeze: '<span class="status-chip freeze" style="font-size:0.65rem;padding:1px 5px;margin-left:4px;">❄️ Freeze</span>',
+      stun:   '<span class="status-chip stun"   style="font-size:0.65rem;padding:1px 5px;margin-left:4px;">⚡ Stun</span>',
+      poison: '<span class="status-chip poison" style="font-size:0.65rem;padding:1px 5px;margin-left:4px;">🐍 Poison</span>'
+    };
+
     spells.forEach(spell => {
       const btn = document.createElement('button');
       btn.className = `spell-btn ${spell.element}`;
       btn.disabled = player.mp < spell.cost;
-      
       const emoji = spell.element === 'fire' ? '🔥' : spell.element === 'water' ? '💧' : spell.element === 'earth' ? '🌿' : '⚡';
       const actualPower = spell.power + extraPower;
-
+      const badgeHtml = spell.statusInflict ? statusBadgeMap[spell.statusInflict] : '';
       btn.innerHTML = `
         <span class="spell-icon-sm">${emoji}</span>
-        <span class="spell-name-sm">${spell.name}</span>
+        <span class="spell-name-sm">${spell.name} ${badgeHtml}</span>
         <span class="spell-cost-sm">${spell.cost > 0 ? `${spell.cost} MP` : 'FREE'} (Pow: ${actualPower})</span>
       `;
-      
       btn.addEventListener('click', () => {
         if (window.AudioEngine) window.AudioEngine.playClick();
         castSpell(spell);
       });
       container.appendChild(btn);
     });
+
+    // Show locked spells (grayed out) so player knows what to train for
+    if (window.TrainingEngine) {
+      const lockedSpells = advancedSpells.filter(sp => !window.TrainingEngine.isUnlocked(sp.spellId));
+      if (lockedSpells.length > 0) {
+        const divider = document.createElement('div');
+        divider.style.cssText = 'grid-column:1/-1;text-align:center;color:#475569;font-size:0.78rem;padding:6px 0;border-top:1px solid rgba(255,255,255,0.06);margin-top:4px;';
+        divider.innerHTML = '🔒 Train in <strong style="color:#6366f1">Magic Training</strong> to unlock more spells';
+        container.appendChild(divider);
+      }
+    }
   };
 
   const castSpell = (spell) => {
@@ -743,6 +981,17 @@ const BattleEngine = (() => {
         }
       }
 
+      // Inflict Status Effects ONLY from spells specifically designed to inflict them!
+      if (activeSpell.statusInflict) {
+        const dur = activeSpell.statusInflict === 'poison' ? 3 : (activeSpell.statusInflict === 'stun' ? 1 : 2);
+        applyStatusEffect('enemy', activeSpell.statusInflict, dur);
+      }
+
+      // Nether Hydra Ally Companion: Inflicts Toxic Poison on Every Hit!
+      if (player.activePet && (player.activePet.name === 'Nether Hydra' || player.activePet.name.includes('Nether Hydra'))) {
+        applyStatusEffect('enemy', 'poison', 3);
+      }
+
       enemy.hp = Math.max(0, enemy.hp - damage);
       updateHPBar('enemy', enemy.hp, enemy.hpMax);
       
@@ -759,6 +1008,9 @@ const BattleEngine = (() => {
       } else if (petDmg > 0) {
         document.getElementById('battle-announcer').innerText = `🐾 Your pet helper ${player.activePet.name} attacks dealing +${petDmg} physical damage!`;
       }
+
+      // Process status tick damage on enemy
+      const eDefeated = processStatusTick('enemy');
       
       // Hit flash
       if (window.AudioEngine) window.AudioEngine.playImpact();
@@ -768,7 +1020,7 @@ const BattleEngine = (() => {
       setTimeout(() => {
         enemyComp.classList.remove('hit');
         
-        if (enemy.hp <= 0) {
+        if (enemy.hp <= 0 || eDefeated) {
           handleVictory();
         } else {
           executeEnemyAttack();
@@ -778,8 +1030,29 @@ const BattleEngine = (() => {
   };
 
   const executeEnemyAttack = () => {
-    document.getElementById('battle-announcer').innerText = `${enemy.name} counters!`;
-    document.getElementById('combatant-enemy').classList.add('attacking');
+    // 1. Process Status Ticks for Enemy at start of Enemy turn
+    processStatusTick('enemy', (enemyDefeated) => {
+      if (enemyDefeated) {
+        handleVictory();
+        return;
+      }
+
+      // 2. Check if Enemy is STUNNED
+      const stunIdx = enemyStatusEffects.findIndex(s => s.type === 'stun');
+      if (stunIdx !== -1) {
+        enemyStatusEffects.splice(stunIdx, 1);
+        renderStatusChips();
+        document.getElementById('battle-announcer').innerText = `⚡ ${enemy.name} is STUNNED! Their turn is skipped!`;
+        if (window.AudioEngine) window.AudioEngine.playSparkle();
+
+        setTimeout(() => {
+          resetActionPanel();
+        }, 1400);
+        return;
+      }
+
+      document.getElementById('battle-announcer').innerText = `${enemy.name} counters!`;
+      document.getElementById('combatant-enemy').classList.add('attacking');
 
     setTimeout(() => {
       document.getElementById('combatant-enemy').classList.remove('attacking');
@@ -790,8 +1063,14 @@ const BattleEngine = (() => {
       const randDmg = Math.floor(Math.random() * 5);
       let dmg = Math.round((baseDmg + randDmg) * multiplier);
 
+      // Frost Freeze Reduction (-30% enemy attack damage)
+      if (enemyStatusEffects.some(s => s.type === 'freeze')) {
+        dmg = Math.max(1, Math.round(dmg * 0.70));
+        showDamageFlyout("❄️ FROZEN -30%", 'enemy', 'water');
+      }
+
       // Obsidian Golem Ally Fortress Armor Buff (Takes 25% less damage!)
-      if (player.activePet && player.activePet.name === 'Obsidian Golem') {
+      if (player.activePet && (player.activePet.name === 'Obsidian Golem' || (player.activePet.name && player.activePet.name.includes('Obsidian Golem')))) {
         dmg = Math.max(1, Math.round(dmg * 0.75));
         showDamageFlyout("🛡️ -25% ARMOR", 'player', 'earth');
       }
@@ -801,6 +1080,36 @@ const BattleEngine = (() => {
       
       showDamageFlyout(dmg, 'player', 'physical');
       if (window.AudioEngine) window.AudioEngine.playImpact();
+
+      // Enemy / Boss Status Infliction & Special Abilities on Player
+      if (enemy.isBoss) {
+        if (enemy.name === 'Valence Overlord' || realmSubject === 'chem') {
+          // Valence Overlord: Toxic Chemical Overlord Poison
+          applyStatusEffect('player', 'poison', 3);
+        } else if (enemy.name === 'Quantum Singularity' || realmSubject === 'phys') {
+          // Quantum Singularity: Gravitational Electric Stun or Burn
+          if (Math.random() < 0.50) {
+            applyStatusEffect('player', Math.random() < 0.50 ? 'burn' : 'stun', 1);
+          }
+        } else if (enemy.name === 'Titan of Equations' || realmSubject === 'math') {
+          // Titan of Equations: Tectonic Equation Stun
+          if (Math.random() < 0.40) applyStatusEffect('player', 'stun', 1);
+        } else if (enemy.name === 'DNA Sentinel' || realmSubject === 'bio') {
+          // DNA Sentinel: Cellular Regeneration (Heals Boss 8% HP per turn)
+          const bossHeal = Math.round(enemy.hpMax * 0.08);
+          enemy.hp = Math.min(enemy.hpMax, enemy.hp + bossHeal);
+          updateHPBar('enemy', enemy.hp, enemy.hpMax);
+          showDamageFlyout(`+${bossHeal} HP`, 'enemy', 'earth');
+        }
+      } else if (enemy.name.includes('Nether Hydra')) {
+        applyStatusEffect('player', 'poison', 3);
+      } else if (enemy.name.includes('Obsidian Golem')) {
+        if (Math.random() < 0.40) applyStatusEffect('player', 'stun', 1);
+      } else if (enemy.name.includes('Acid Sludge') || enemy.name.includes('Periodic Pixie')) {
+        if (Math.random() < 0.45) applyStatusEffect('player', 'poison', 3);
+      } else if (enemy.name.includes('Pyromancer')) {
+        if (Math.random() < 0.35) applyStatusEffect('player', 'burn', 2);
+      }
       
       const playerComp = document.getElementById('combatant-player');
       playerComp.classList.add('hit');
@@ -816,6 +1125,7 @@ const BattleEngine = (() => {
       }, 500);
 
     }, 800);
+    });
   };
 
   const executeCaptureSuccess = () => {
@@ -849,7 +1159,8 @@ const BattleEngine = (() => {
       element: petElement,
       subject: realmSubject,
       sprite: petSpritePath,
-      level: enemy.level
+      level: enemy.level,
+      isSpecial: !!enemy.isSpecial
     };
 
     if (!player.pets) player.pets = [];
@@ -900,10 +1211,10 @@ const BattleEngine = (() => {
 
     player.battlesWon += 1;
     
-    // Progress tracking (based on the realm of the encountered minion/boss)
+    // Progress tracking (Surface minions unlock bosses, dungeon monsters do NOT)
     if (enemy.isBoss) {
       player.defeatedBosses[realmSubject] = true;
-    } else {
+    } else if (enemy.name !== 'Obsidian Golem' && enemy.name !== 'Nether Hydra') {
       player.minionsDefeated[realmSubject] = Math.min(3, (player.minionsDefeated[realmSubject] || 0) + 1);
     }
 

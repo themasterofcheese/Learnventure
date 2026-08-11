@@ -10,7 +10,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;700&family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
   <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css?v=65">
+  <link rel="stylesheet" href="style.css?v=99">
+  <!-- Three.js 3D WebGL Engine (Local File) -->
+  <script src="src/three.min.js"></script>
   <!-- Global JS Error Boundary for Easy Debugging -->
   <script>
     (function() {
@@ -77,6 +79,7 @@
         <button id="nav-lab" class="nav-btn">🪄 Magic Training</button>
         <button id="nav-dashboard" class="nav-btn">📊 Inventory & Stats</button>
         <button id="nav-allies" class="nav-btn">🐾 Allies</button>
+        <button id="nav-pvp" class="nav-btn">⚔️ PvP Arena</button>
       </nav>
     </div>
 
@@ -210,9 +213,11 @@
           <p class="map-progress-tracker">Explore the map. Defeat 3 minions in any realm to summon the **Realm Boss** in the center of that realm!</p>
         </div>
         
-        <div class="map-world" style="position: relative;">
-          <!-- 2D Canvas Map expanded for larger screen viewing -->
-          <canvas id="adventure-canvas" width="1150" height="560" style="max-height: calc(100vh - 140px); width: 100%; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);"></canvas>
+        <div class="map-world" style="position: relative; width: 100%; height: 560px; max-height: calc(100vh - 140px); border-radius: 12px; overflow: hidden;">
+          <!-- Three.js 3D WebGL Canvas Layer -->
+          <canvas id="adventure-canvas-3d" width="1150" height="560" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);"></canvas>
+          <!-- 2D Canvas Map & HUD Overlay -->
+          <canvas id="adventure-canvas" width="1150" height="560" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2; pointer-events: none; background: transparent;"></canvas>
 
           <!-- On-screen Virtual D-Pad Overlay -->
           <div class="dpad-overlay">
@@ -270,9 +275,10 @@
                   <div class="bar-outer"><div id="player-mp-bar" class="bar-inner mp" style="width: 100%"></div></div>
                   <span class="bar-val" id="player-mp-text">50/50</span>
                 </div>
+                <div id="player-status-chips" class="status-chips-row"></div>
               </div>
             </div>
-            <div class="sprite-container">
+            <div id="player-sprite-box" class="sprite-container">
               <img id="player-sprite" src="assets/wizard_avatar.jpg" alt="Player Avatar" class="sprite-img">
               <div id="player-staff-overlay" class="player-staff-layer hidden">🪄</div>
               <div id="player-cast-glow" class="cast-glow"></div>
@@ -301,6 +307,7 @@
               <div class="bar-stat level">
                 <span class="bar-badge" id="enemy-level-text">Lv. 3</span>
               </div>
+              <div id="enemy-status-chips" class="status-chips-row"></div>
             </div>
             <div class="sprite-container">
               <!-- Inline Monster SVG (hidden fallback) -->
@@ -394,35 +401,19 @@
 
     <!-- SCREEN 4: Magic STEM Training Academy -->
     <section id="screen-lab" class="screen hidden">
-      <div style="max-width: 1000px; margin: 0 auto; padding: 15px;">
+      <div style="max-width: 1100px; margin: 0 auto; padding: 15px;">
         <div style="text-align: center; margin-bottom: 20px;">
           <h2 style="font-size: 2.1rem; background: linear-gradient(135deg, #a855f7, #ec4899); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 800; margin: 0 0 6px;">
             🪄 Archmage STEM Magic Academy
           </h2>
           <p style="color: var(--text-secondary); font-size: 0.95rem; max-width: 650px; margin: 0 auto; line-height: 1.5;">
-            Master step-by-step solutions, key rules, and worked examples for all 4 elemental STEM subjects to dominate combat!
+            Study STEM topics and pass 10-question tests to permanently unlock powerful Stage 3 &amp; 4 spells for battle!
           </p>
         </div>
 
-        <!-- Subject Selection Tabs -->
-        <div id="training-subject-bar" style="display: flex; justify-content: center; gap: 10px; margin-bottom: 22px; flex-wrap: wrap;">
-          <button class="training-tab-btn active" data-subject="chem" style="padding: 10px 20px; border-radius: 30px; border: 1.5px solid #ef4444; background: rgba(239, 68, 68, 0.2); color: #f8fafc; font-weight: 700; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-            🔥 Chemistry (Fire Spells)
-          </button>
-          <button class="training-tab-btn" data-subject="math" style="padding: 10px 20px; border-radius: 30px; border: 1.5px solid rgba(59, 130, 246, 0.4); background: rgba(59, 130, 246, 0.1); color: #94a3b8; font-weight: 700; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-            💧 Mathematics (Water Spells)
-          </button>
-          <button class="training-tab-btn" data-subject="bio" style="padding: 10px 20px; border-radius: 30px; border: 1.5px solid rgba(34, 197, 94, 0.4); background: rgba(34, 197, 94, 0.1); color: #94a3b8; font-weight: 700; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-            🌿 Biology (Earth Spells)
-          </button>
-          <button class="training-tab-btn" data-subject="phys" style="padding: 10px 20px; border-radius: 30px; border: 1.5px solid rgba(168, 85, 247, 0.4); background: rgba(168, 85, 247, 0.1); color: #94a3b8; font-weight: 700; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 6px;">
-            ⚡ Physics (Lightning Spells)
-          </button>
-        </div>
-
-        <!-- Dynamic Training Content Card -->
+        <!-- Dynamic Training Content Card (rendered by TrainingEngine) -->
         <div id="training-content-card" class="glass" style="border: 1px solid rgba(255,255,255,0.15); border-radius: var(--radius-lg); padding: 25px; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(12px);">
-          <!-- Renders training guide dynamically -->
+          <!-- Populated by TrainingEngine.renderTrainingScreen() -->
         </div>
       </div>
     </section>
@@ -709,6 +700,92 @@
       </div>
     </section>
 
+    <!-- SCREEN 12: Online PvP Arena Tab -->
+    <section id="screen-pvp" class="screen hidden" style="padding: 24px;">
+      <div class="screen-header" style="display: flex; justify-content: space-between; align-items: center;">
+        <div>
+          <h1 class="text-glow" style="font-size: 2.2rem; font-weight: 800; background: linear-gradient(135deg, #ef4444, #f59e0b); -webkit-background-clip: text; -webkit-text-fill-color: transparent;">⚔️ Online PvP Arena</h1>
+          <p class="subtitle" style="color: var(--text-secondary); margin-top: 4px;">Invite your friends or challenge online wizards to real-time STEM magic duels!</p>
+        </div>
+        <div class="pvp-stat-card glass" style="display: flex; gap: 16px; padding: 12px 20px; border-radius: 12px; border: 1px solid rgba(239, 68, 68, 0.3);">
+          <div style="text-align: center;">
+            <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">PvP Rating</div>
+            <div id="pvp-rating-val" style="font-size: 1.3rem; font-weight: 900; color: #fbbf24;">1,250 ELO</div>
+          </div>
+          <div style="width: 1px; background: rgba(255,255,255,0.1);"></div>
+          <div style="text-align: center;">
+            <div style="font-size: 0.75rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Duels Won</div>
+            <div id="pvp-wins-val" style="font-size: 1.3rem; font-weight: 900; color: #22c55e;">0 W</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="pvp-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px;">
+        
+        <!-- CARD 1: Host Room & Invite Friends -->
+        <div class="pvp-card glass" style="padding: 28px; border-radius: 16px; border: 1px solid rgba(168, 85, 247, 0.3); background: linear-gradient(180deg, rgba(30, 27, 75, 0.6) 0%, rgba(15, 23, 42, 0.8) 100%);">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <span style="font-size: 2rem;">👑</span>
+            <div>
+              <h3 style="font-size: 1.4rem; font-weight: 800; color: #f8fafc;">Host a Friend Duel</h3>
+              <p style="font-size: 0.85rem; color: #94a3b8;">Create a room code & share invite link to play together!</p>
+            </div>
+          </div>
+
+          <div id="pvp-create-room-view">
+            <button id="pvp-create-room-btn" class="cta-btn primary" style="width: 100%; padding: 14px; font-size: 1.1rem; font-weight: 800; background: linear-gradient(135deg, #a855f7, #6366f1); border-radius: 12px; cursor: pointer;">🎮 Create Multiplayer Room</button>
+          </div>
+
+          <div id="pvp-room-lobby-view" class="hidden" style="display: flex; flex-direction: column; gap: 16px; margin-top: 12px;">
+            <div style="background: rgba(15, 23, 42, 0.9); padding: 16px; border-radius: 12px; border: 1.5px dashed #a855f7; text-align: center;">
+              <div style="font-size: 0.8rem; color: #94a3b8; font-weight: 700; text-transform: uppercase;">Room Code</div>
+              <div id="pvp-room-code-display" style="font-size: 2.2rem; font-weight: 900; letter-spacing: 4px; color: #38bdf8; margin: 4px 0;">KQ-89F2</div>
+              <div style="font-size: 0.8rem; color: #94a3b8;">Share this code with your friend!</div>
+            </div>
+
+            <div style="display: flex; gap: 10px;">
+              <input id="pvp-share-link-input" type="text" readonly value="http://localhost:8000/?pvp_room=KQ-89F2" style="flex: 1; padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.1); color: #f8fafc; font-size: 0.85rem; font-family: monospace;">
+              <button id="pvp-copy-link-btn" class="cta-btn" style="padding: 10px 16px; background: #3b82f6; border-radius: 8px; font-weight: 700; cursor: pointer;">📋 Copy</button>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 12px; padding: 12px; background: rgba(34, 197, 94, 0.1); border: 1px solid rgba(34, 197, 94, 0.3); border-radius: 10px;">
+              <div class="spinner-sm" style="width: 20px; height: 20px; border: 3px solid rgba(255,255,255,0.2); border-top-color: #22c55e; border-radius: 50%; animation: spin 1s infinite linear;"></div>
+              <span id="pvp-lobby-status-text" style="font-size: 0.9rem; color: #4ade80; font-weight: 600;">Waiting for challenger to join room...</span>
+            </div>
+            
+            <button id="pvp-cancel-room-btn" style="background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #94a3b8; padding: 8px; border-radius: 8px; cursor: pointer;">Cancel Room</button>
+          </div>
+        </div>
+
+        <!-- CARD 2: Join Friend's Room or Quick Match -->
+        <div class="pvp-card glass" style="padding: 28px; border-radius: 16px; border: 1px solid rgba(59, 130, 246, 0.3); background: linear-gradient(180deg, rgba(15, 23, 42, 0.8) 0%, rgba(30, 41, 59, 0.6) 100%);">
+          <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px;">
+            <span style="font-size: 2rem;">🔑</span>
+            <div>
+              <h3 style="font-size: 1.4rem; font-weight: 800; color: #f8fafc;">Join a Room / Quick Match</h3>
+              <p style="font-size: 0.85rem; color: #94a3b8;">Enter a friend's room code or pair with online wizards instantly!</p>
+            </div>
+          </div>
+
+          <div style="display: flex; flex-direction: column; gap: 14px;">
+            <div style="display: flex; gap: 10px;">
+              <input id="pvp-join-code-input" type="text" placeholder="Enter Room Code (e.g. KQ-89F2)" style="flex: 1; padding: 12px 16px; border-radius: 10px; background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.15); color: #f8fafc; font-size: 1rem; font-weight: 700; text-transform: uppercase; font-family: monospace;">
+              <button id="pvp-join-btn" class="cta-btn primary" style="padding: 12px 20px; font-weight: 800; background: #3b82f6; border-radius: 10px; cursor: pointer;">⚡ Join Room</button>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 12px; margin: 8px 0;">
+              <div style="flex:1; height:1px; background: rgba(255,255,255,0.1);"></div>
+              <span style="font-size: 0.75rem; color: #64748b; font-weight: 700; text-transform: uppercase;">OR</span>
+              <div style="flex:1; height:1px; background: rgba(255,255,255,0.1);"></div>
+            </div>
+
+            <button id="pvp-quick-match-btn" class="cta-btn" style="width: 100%; padding: 14px; font-size: 1.1rem; font-weight: 800; background: linear-gradient(135deg, #ef4444, #f59e0b); border-radius: 12px; cursor: pointer;">🌐 Quick Online Matchmaking</button>
+          </div>
+        </div>
+
+      </div>
+    </section>
+
   </main>
 
   <!-- Narrative Story Intro Overlay Modal -->
@@ -799,6 +876,21 @@
     </div>
   </div>
 
+  <!-- Dungeon Treasure Chest Loot Modal -->
+  <div id="chest-loot-modal" class="modal hidden" style="z-index: 10000;">
+    <div class="modal-card glass chest-loot-card" style="text-align: center; max-width: 400px; padding: 28px; border: 2px solid #fbbf24; background: rgba(15, 23, 42, 0.95); box-shadow: 0 0 35px rgba(251, 191, 36, 0.4); animation: popIn 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);">
+      <div style="font-size: 3.5rem; margin-bottom: 8px; filter: drop-shadow(0 0 12px rgba(251, 191, 36, 0.7));">🎁</div>
+      <div style="font-size: 0.85rem; font-weight: 800; color: #fbbf24; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 4px;">✨ TREASURE CHEST OPENED!</div>
+      <h3 style="margin: 0 0 14px; color: #fef3c7; font-size: 1.4rem; font-weight: 800;">Subterranean Loot Found</h3>
+      
+      <div id="chest-loot-details" style="background: rgba(30, 41, 59, 0.8); border: 1px solid rgba(251, 191, 36, 0.3); border-radius: 12px; padding: 14px; margin-bottom: 20px; text-align: left; font-size: 0.95rem; color: #e2e8f0; line-height: 1.6;">
+        <!-- Dynamic loot info rendered here -->
+      </div>
+      
+      <button id="close-chest-loot-btn" class="cta-btn primary" style="width: 100%; padding: 12px; font-size: 1rem; font-weight: 700; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">Claim Loot</button>
+    </div>
+  </div>
+
   <!-- Interactive Medieval Merchant Shop Modal -->
   <div id="medieval-merchant-modal" class="modal hidden">
     <div class="modal-card medieval-market-container" style="max-width: 650px; width: 90%; padding: 24px; position: relative;">
@@ -810,7 +902,10 @@
           <h2 id="merchant-modal-name">Alchemist Gideon</h2>
         </div>
         <div class="shopkeeper-dialogue-box">
-          <div class="shopkeeper-avatar" id="merchant-modal-avatar">🧙‍♂️</div>
+          <div class="shopkeeper-avatar" style="position: relative; width: 64px; height: 64px; display: flex; align-items: center; justify-content: center; overflow: hidden; border-radius: 12px; border: 2px solid #f59e0b; background: rgba(15, 23, 42, 0.8);">
+            <img id="merchant-modal-sprite" src="assets/merchant_alchemist.jpg" style="width: 100%; height: 100%; object-fit: cover;" />
+            <span id="merchant-modal-avatar" style="display: none;">🧙‍♂️</span>
+          </div>
           <div class="shopkeeper-text">
             <span class="shopkeeper-title" id="merchant-modal-title">Master Alchemist</span>
             <p class="shopkeeper-quote" id="merchant-modal-quote">"Greetings traveler! Browse my finest potions and elixirs."</p>
@@ -826,10 +921,13 @@
 
   <!-- Javascript Modules -->
   <script src="src/audio.js"></script>
-  <script src="src/questions.js?v=65"></script>
-  <script src="src/battle.js?v=65"></script>
-  <script src="src/higgsfield.js?v=65"></script>
-  <script src="src/dashboard.js?v=65"></script>
-  <script src="src/main.js?v=65"></script>
+  <script src="src/questions.js?v=100"></script>
+  <script src="src/battle.js?v=100"></script>
+  <script src="src/training.js?v=100"></script>
+  <script src="src/higgsfield.js?v=100"></script>
+  <script src="src/dashboard.js?v=100"></script>
+  <script src="src/pvp.js?v=100"></script>
+  <script src="src/world3d.js?v=100"></script>
+  <script src="src/main.js?v=100"></script>
 </body>
 </html>
