@@ -21,6 +21,24 @@ const BattleEngine = (() => {
   let playerStatusEffects = [];
   let enemyStatusEffects = [];
 
+  const setTransparentImgSrc = (imgElement, rawSrc) => {
+    if (!imgElement || !rawSrc) return;
+    imgElement.dataset.rawSrc = rawSrc;
+    if (window.getTransparentSprite) {
+      const cleanObj = window.getTransparentSprite(rawSrc);
+      if (cleanObj && cleanObj.src && cleanObj.src.startsWith('data:')) {
+        imgElement.src = cleanObj.src;
+      } else if (cleanObj) {
+        cleanObj.onload = () => { if (cleanObj.src) imgElement.src = cleanObj.src; };
+        imgElement.src = cleanObj.src || rawSrc;
+      } else {
+        imgElement.src = rawSrc;
+      }
+    } else {
+      imgElement.src = rawSrc;
+    }
+  };
+
   const renderStatusChips = () => {
     const pContainer = document.getElementById('player-status-chips');
     const eContainer = document.getElementById('enemy-status-chips');
@@ -383,24 +401,6 @@ const BattleEngine = (() => {
         starBadge.classList.add('hidden');
       }
     }
-
-    const setTransparentImgSrc = (imgElement, rawSrc) => {
-      if (!imgElement || !rawSrc) return;
-      imgElement.dataset.rawSrc = rawSrc;
-      if (window.getTransparentSprite) {
-        const cleanObj = window.getTransparentSprite(rawSrc);
-        if (cleanObj && cleanObj.src && cleanObj.src.startsWith('data:')) {
-          imgElement.src = cleanObj.src;
-        } else if (cleanObj) {
-          cleanObj.onload = () => { if (cleanObj.src) imgElement.src = cleanObj.src; };
-          imgElement.src = cleanObj.src || rawSrc;
-        } else {
-          imgElement.src = rawSrc;
-        }
-      } else {
-        imgElement.src = rawSrc;
-      }
-    };
 
     const playerSprite = document.getElementById('player-sprite');
     if (playerSprite) {
