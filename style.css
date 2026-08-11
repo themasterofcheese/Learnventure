@@ -2168,6 +2168,123 @@ input[type="range"] {
   to { transform: translateY(-4px) rotate(15deg); }
 }
 
+@keyframes stunShake {
+  0% { transform: translateX(-3px) rotate(-2deg); }
+  100% { transform: translateX(3px) rotate(2deg); }
+}
+
+/* ==========================================================================
+   BLACK HOLE CAPTURE CRYSTAL ANIMATION
+   ========================================================================== */
+.capture-crystal-container {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 180px;
+  height: 180px;
+  pointer-events: none;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.capture-crystal {
+  position: relative;
+  width: 90px;
+  height: 90px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.crystal-core {
+  font-size: 3.5rem;
+  z-index: 10;
+  filter: drop-shadow(0 0 20px #a855f7) drop-shadow(0 0 35px #06b6d4);
+  animation: crystalFloat 1.2s ease-in-out infinite alternate;
+  transition: transform 0.3s ease, filter 0.3s ease;
+}
+
+.blackhole-swirl {
+  position: absolute;
+  width: 170px;
+  height: 170px;
+  border-radius: 50%;
+  border: 3px dashed #c084fc;
+  box-shadow: 0 0 30px #a855f7, inset 0 0 35px #06b6d4;
+  animation: blackHoleSpin 0.7s linear infinite;
+  z-index: 5;
+}
+
+.event-horizon {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #020617 35%, rgba(168, 85, 247, 0.85) 75%, transparent 100%);
+  box-shadow: 0 0 40px #020617, 0 0 65px #a855f7;
+  z-index: 4;
+  animation: eventHorizonPulse 0.9s ease-in-out infinite alternate;
+}
+
+@keyframes blackHoleSpin {
+  0% { transform: rotate(0deg) scale(0.9); }
+  50% { transform: rotate(180deg) scale(1.15); }
+  100% { transform: rotate(360deg) scale(0.9); }
+}
+
+@keyframes eventHorizonPulse {
+  0% { transform: scale(0.85); opacity: 0.8; }
+  100% { transform: scale(1.2); opacity: 1; }
+}
+
+@keyframes crystalFloat {
+  0% { transform: translateY(-6px) scale(1); }
+  100% { transform: translateY(6px) scale(1.1); }
+}
+
+/* Black Hole Sucking Animation on Enemy Sprite */
+.sucked-into-blackhole {
+  animation: suckedIntoBlackHole 1.4s cubic-bezier(0.55, 0.055, 0.675, 0.19) forwards !important;
+  transform-origin: center center;
+}
+
+@keyframes suckedIntoBlackHole {
+  0% {
+    transform: scale(1) rotate(0deg);
+    opacity: 1;
+    filter: drop-shadow(0 0 10px rgba(168, 85, 247, 0.8));
+  }
+  35% {
+    transform: scale(0.65) rotate(270deg) skew(15deg, 15deg);
+    opacity: 0.9;
+    filter: drop-shadow(0 0 25px #a855f7) hue-rotate(90deg);
+  }
+  75% {
+    transform: scale(0.18) rotate(720deg) skew(30deg, 30deg);
+    opacity: 0.4;
+    filter: drop-shadow(0 0 40px #06b6d4) brightness(2.5);
+  }
+  100% {
+    transform: scale(0.01) rotate(1080deg) translate(0, 0);
+    opacity: 0;
+    filter: brightness(5);
+  }
+}
+
+/* Capture Crystal Snap Close Effect */
+.crystal-snap-close {
+  animation: crystalSnapClose 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards !important;
+}
+
+@keyframes crystalSnapClose {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.8); filter: brightness(3.5) drop-shadow(0 0 60px #38bdf8); }
+  100% { transform: scale(1); filter: drop-shadow(0 0 25px #a855f7); }
+}
+
 .sprite-img {
   transition: filter 0.2s ease;
 }

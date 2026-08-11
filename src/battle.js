@@ -1158,7 +1158,32 @@ const BattleEngine = (() => {
   };
 
   const executeCaptureSuccess = () => {
-    if (window.AudioEngine) window.AudioEngine.playSparkle();
+    if (window.AudioEngine) {
+      window.AudioEngine.playCast('air');
+      window.AudioEngine.playSparkle();
+    }
+    
+    const enemySprite = document.getElementById('enemy-sprite-img');
+    const captureOverlay = document.getElementById('capture-crystal-overlay');
+    const crystalCore = captureOverlay ? captureOverlay.querySelector('.crystal-core') : null;
+
+    // Trigger Black Hole Capture Crystal Overlay
+    if (captureOverlay) {
+      captureOverlay.classList.remove('hidden');
+    }
+
+    // Trigger Enemy Sprite Black Hole Vortex Sucking Animation
+    if (enemySprite) {
+      enemySprite.classList.add('sucked-into-blackhole');
+    }
+
+    // Snap crystal closed with bright flash & sparkle audio
+    setTimeout(() => {
+      if (crystalCore) {
+        crystalCore.classList.add('crystal-snap-close');
+      }
+      if (window.AudioEngine) window.AudioEngine.playSparkle();
+    }, 1200);
     
     const getPetElement = (subj) => {
       if (subj === 'chem') return 'fire';
@@ -1200,11 +1225,16 @@ const BattleEngine = (() => {
       player.pets.push(petObj);
     }
     
-    document.getElementById('battle-announcer').innerText = `SUCCESS! You rescued and captured the wild ${petObj.name}!`;
+    document.getElementById('battle-announcer').innerText = `🔮 BLACK HOLE ABSORPTION! You captured ${petObj.name}!`;
 
     setTimeout(() => {
+      if (captureOverlay) captureOverlay.classList.add('hidden');
+      if (enemySprite) {
+        enemySprite.classList.remove('sucked-into-blackhole');
+      }
+      if (crystalCore) crystalCore.classList.remove('crystal-snap-close');
       handleVictory(true); // Win battle with capture trigger
-    }, 1500);
+    }, 1850);
   };
 
   const handleVictory = (captured = false) => {
