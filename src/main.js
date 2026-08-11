@@ -519,6 +519,7 @@ const App = (() => {
     rawImg.src = imgSrc;
     return cleanImg;
   };
+  window.getTransparentSprite = getTransparentSprite;
 
   const getPetSpriteSrc = (pet) => {
     if (!pet) return 'assets/minion_bio.jpg';

@@ -384,11 +384,35 @@ const BattleEngine = (() => {
       }
     }
 
+    const setTransparentImgSrc = (imgElement, rawSrc) => {
+      if (!imgElement || !rawSrc) return;
+      imgElement.dataset.rawSrc = rawSrc;
+      if (window.getTransparentSprite) {
+        const cleanObj = window.getTransparentSprite(rawSrc);
+        if (cleanObj && cleanObj.src && cleanObj.src.startsWith('data:')) {
+          imgElement.src = cleanObj.src;
+        } else if (cleanObj) {
+          cleanObj.onload = () => { if (cleanObj.src) imgElement.src = cleanObj.src; };
+          imgElement.src = cleanObj.src || rawSrc;
+        } else {
+          imgElement.src = rawSrc;
+        }
+      } else {
+        imgElement.src = rawSrc;
+      }
+    };
+
+    const playerSprite = document.getElementById('player-sprite');
+    if (playerSprite) {
+      setTransparentImgSrc(playerSprite, `assets/sprite_${player.avatar || 'boy'}.jpg`);
+    }
+
     const enemySprite = document.getElementById('enemy-sprite-img');
     if (enemySprite) {
       if (svgEl) svgEl.innerHTML = ''; // Clear SVG vector layer so image sprite is 100% visible
+      let rawSrc = '';
       if (isBossBattle) {
-        enemySprite.src = `assets/boss_${subject}.jpg`;
+        rawSrc = `assets/boss_${subject}.jpg`;
       } else {
         const minionImageMap = {
           "Fraction Wraith": "assets/minion_math_wraith.jpg",
@@ -403,8 +427,9 @@ const BattleEngine = (() => {
           "Nether Hydra": "assets/minion_dungeon_hydra.jpg"
         };
         const searchName = enemy.rawName || enemy.name;
-        enemySprite.src = minionImageMap[searchName] || `assets/minion_${subject}.jpg`;
+        rawSrc = minionImageMap[searchName] || `assets/minion_${subject}.jpg`;
       }
+      setTransparentImgSrc(enemySprite, rawSrc);
     }
     
     // Setup HUD
@@ -857,14 +882,18 @@ const BattleEngine = (() => {
     
     const spriteImg = document.getElementById('cinematic-player-sprite');
     if (spriteImg) {
-      spriteImg.src = `assets/sprite_${player.avatar}.jpg`;
+      const pRawSrc = `assets/sprite_${player.avatar || 'boy'}.jpg`;
+      setTransparentImgSrc(spriteImg, pRawSrc);
       spriteImg.classList.remove('hidden');
     }
 
     const enemySpriteImg = document.getElementById('cinematic-enemy-sprite');
     if (enemySpriteImg) {
       const activeEnemySprite = document.getElementById('enemy-sprite-img');
-      enemySpriteImg.src = activeEnemySprite ? activeEnemySprite.src : '';
+      const enemyRawSrc = (activeEnemySprite && activeEnemySprite.dataset && activeEnemySprite.dataset.rawSrc)
+        ? activeEnemySprite.dataset.rawSrc
+        : (activeEnemySprite ? activeEnemySprite.src : '');
+      setTransparentImgSrc(enemySpriteImg, enemyRawSrc);
       enemySpriteImg.classList.remove('hidden');
     }
 

@@ -1173,15 +1173,17 @@ input[type="text"]:focus {
 
 .cinematic-sprite-popup {
   position: absolute;
-  bottom: 15px;
-  left: 25px;
-  width: 140px;
-  height: 140px;
-  object-fit: cover;
+  bottom: 20px;
+  left: 30px;
+  width: 155px;
+  height: 155px;
+  object-fit: contain;
   z-index: 15;
-  border-radius: var(--radius-md);
-  border: 2.5px solid var(--border-glass);
-  box-shadow: 0 0 25px rgba(168, 85, 247, 0.4);
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  filter: drop-shadow(0 12px 20px rgba(0, 0, 0, 0.75)) drop-shadow(0 0 15px rgba(168, 85, 247, 0.5));
   animation: spriteSlideUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
@@ -1198,15 +1200,17 @@ input[type="text"]:focus {
 
 .cinematic-enemy-sprite-popup {
   position: absolute;
-  bottom: 15px;
-  right: 25px;
-  width: 140px;
-  height: 140px;
-  object-fit: cover;
+  bottom: 20px;
+  right: 30px;
+  width: 155px;
+  height: 155px;
+  object-fit: contain;
   z-index: 15;
-  border-radius: var(--radius-md);
-  border: 2.5px solid var(--border-glass);
-  box-shadow: 0 0 25px rgba(239, 68, 68, 0.4);
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  filter: drop-shadow(0 12px 20px rgba(0, 0, 0, 0.75)) drop-shadow(0 0 15px rgba(239, 68, 68, 0.5));
   animation: spriteSlideUp 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
