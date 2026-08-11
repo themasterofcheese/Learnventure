@@ -593,8 +593,8 @@ const App = (() => {
       const map3DX = ((x / 3600) * 180) - 90;
       const map3DZ = ((y / 1760) * 80) - 40;
       const tH = window.World3DEngine.getTerrainHeight(map3DX, map3DZ);
-      // Impassable outer mountain walls or deep rift chasms
-      if (tH > 18.0 || tH < -6.0) {
+      // Impassable outer mountain walls
+      if (tH > 18.0) {
         return true;
       }
     }
