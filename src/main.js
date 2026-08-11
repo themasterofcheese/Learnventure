@@ -268,6 +268,8 @@ const App = (() => {
   let keys = { up: false, down: false, left: false, right: false, space: false };
   let mapInterval = null;
   let lastCollidedMinionId = null;
+  let preBattleCoords = null;
+  let surfaceMinions = [];
   let minions = [];
   let particles = [];
   
@@ -758,25 +760,39 @@ const App = (() => {
       initDungeonMinions(activeDungeonId);
       return;
     }
-    // Default minions per quadrant across 3600x1760 world map
-    minions = [
-      // Math Minions (Top Left 0..1800, 0..880)
-      { id: 'math_1', subject: 'math', name: 'Fraction Wraith', sprite: 'assets/minion_math_wraith.jpg', x: 440, y: 300, vx: 1.4, vy: 1.1, radius: 15, emoji: '🔢', active: true },
-      { id: 'math_2', subject: 'math', name: 'Equation Imp', sprite: 'assets/minion_math_imp.jpg', x: 1360, y: 560, vx: -1.1, vy: 1.4, radius: 15, emoji: '✖️', active: true },
-      { id: 'math_3', subject: 'math', name: 'Fraction Wraith', sprite: 'assets/minion_math_wraith.jpg', x: 700, y: 200, vx: 0.9, vy: -1.2, radius: 15, emoji: '🔢', active: true },
-      // Chem Minions (Top Right 1800..3600, 0..880)
-      { id: 'chem_1', subject: 'chem', name: 'Periodic Pixie', sprite: 'assets/minion_chem_pixie.jpg', x: 2240, y: 300, vx: 1.2, vy: -1.4, radius: 15, emoji: '🧪', active: true },
-      { id: 'chem_2', subject: 'chem', name: 'Acid Sludge', sprite: 'assets/minion_chem_sludge.jpg', x: 3160, y: 560, vx: -1.4, vy: -0.9, radius: 15, emoji: '☣️', active: true },
-      { id: 'chem_3', subject: 'chem', name: 'Periodic Pixie', sprite: 'assets/minion_chem_pixie.jpg', x: 2600, y: 200, vx: -0.9, vy: 1.3, radius: 15, emoji: '🧪', active: true },
-      // Bio Minions (Bottom Left 0..1800, 880..1760)
-      { id: 'bio_1', subject: 'bio', name: 'Cellular Slime', sprite: 'assets/minion_bio_slime.jpg', x: 440, y: 1180, vx: 1.1, vy: 1.4, radius: 15, emoji: '🦠', active: true },
-      { id: 'bio_2', subject: 'bio', name: 'Chloroplast Spore', sprite: 'assets/minion_bio_spore.jpg', x: 1360, y: 1440, vx: -1.4, vy: -1.1, radius: 15, emoji: '🍃', active: true },
-      { id: 'bio_3', subject: 'bio', name: 'Cellular Slime', sprite: 'assets/minion_bio_slime.jpg', x: 700, y: 1040, vx: 0.9, vy: -0.9, radius: 15, emoji: '🦠', active: true },
-      // Phys Minions (Bottom Right 1800..3600, 880..1760)
-      { id: 'phys_1', subject: 'phys', name: 'Kinetic Imp', sprite: 'assets/minion_phys_imp.jpg', x: 2240, y: 1180, vx: -1.1, vy: 1.4, radius: 15, emoji: '🏃', active: true },
-      { id: 'phys_2', subject: 'phys', name: 'Magnetic Basilisk', sprite: 'assets/minion_phys_basilisk.jpg', x: 3160, y: 1440, vx: 1.4, vy: -1.1, radius: 15, emoji: '🧲', active: true },
-      { id: 'phys_3', subject: 'phys', name: 'Kinetic Imp', sprite: 'assets/minion_phys_imp.jpg', x: 2600, y: 1040, vx: -1.0, vy: -1.0, radius: 15, emoji: '🏃', active: true }
-    ];
+    if (!surfaceMinions || surfaceMinions.length < 12) {
+      surfaceMinions = [
+        // Math Minions (Top Left 0..1800, 0..880)
+        { id: 'math_1', subject: 'math', name: 'Fraction Wraith', sprite: 'assets/minion_math_wraith.jpg', x: 440, y: 300, vx: 1.4, vy: 1.1, radius: 15, emoji: '🔢', active: true },
+        { id: 'math_2', subject: 'math', name: 'Equation Imp', sprite: 'assets/minion_math_imp.jpg', x: 1360, y: 560, vx: -1.1, vy: 1.4, radius: 15, emoji: '✖️', active: true },
+        { id: 'math_3', subject: 'math', name: 'Fraction Wraith', sprite: 'assets/minion_math_wraith.jpg', x: 700, y: 200, vx: 0.9, vy: -1.2, radius: 15, emoji: '🔢', active: true },
+        // Chem Minions (Top Right 1800..3600, 0..880)
+        { id: 'chem_1', subject: 'chem', name: 'Periodic Pixie', sprite: 'assets/minion_chem_pixie.jpg', x: 2240, y: 300, vx: 1.2, vy: -1.4, radius: 15, emoji: '🧪', active: true },
+        { id: 'chem_2', subject: 'chem', name: 'Acid Sludge', sprite: 'assets/minion_chem_sludge.jpg', x: 3160, y: 560, vx: -1.4, vy: -0.9, radius: 15, emoji: '☣️', active: true },
+        { id: 'chem_3', subject: 'chem', name: 'Periodic Pixie', sprite: 'assets/minion_chem_pixie.jpg', x: 2600, y: 200, vx: -0.9, vy: 1.3, radius: 15, emoji: '🧪', active: true },
+        // Bio Minions (Bottom Left 0..1800, 880..1760)
+        { id: 'bio_1', subject: 'bio', name: 'Cellular Slime', sprite: 'assets/minion_bio_slime.jpg', x: 440, y: 1180, vx: 1.1, vy: 1.4, radius: 15, emoji: '🦠', active: true },
+        { id: 'bio_2', subject: 'bio', name: 'Chloroplast Spore', sprite: 'assets/minion_bio_spore.jpg', x: 1360, y: 1440, vx: -1.4, vy: -1.1, radius: 15, emoji: '🍃', active: true },
+        { id: 'bio_3', subject: 'bio', name: 'Cellular Slime', sprite: 'assets/minion_bio_slime.jpg', x: 700, y: 1040, vx: 0.9, vy: -0.9, radius: 15, emoji: '🦠', active: true },
+        // Phys Minions (Bottom Right 1800..3600, 880..1760)
+        { id: 'phys_1', subject: 'phys', name: 'Kinetic Imp', sprite: 'assets/minion_phys_imp.jpg', x: 2240, y: 1180, vx: -1.1, vy: 1.4, radius: 15, emoji: '🏃', active: true },
+        { id: 'phys_2', subject: 'phys', name: 'Magnetic Basilisk', sprite: 'assets/minion_phys_basilisk.jpg', x: 3160, y: 1440, vx: 1.4, vy: -1.1, radius: 15, emoji: '🧲', active: true },
+        { id: 'phys_3', subject: 'phys', name: 'Kinetic Imp', sprite: 'assets/minion_phys_imp.jpg', x: 2600, y: 1040, vx: -1.0, vy: -1.0, radius: 15, emoji: '🏃', active: true }
+      ];
+
+      // Restore saved minion active states if available
+      try {
+        const savedStates = JSON.parse(localStorage.getItem('knowledge_quest_surface_minions'));
+        if (savedStates && Array.isArray(savedStates)) {
+          savedStates.forEach(s => {
+            const m = surfaceMinions.find(item => item.id === s.id);
+            if (m) m.active = s.active;
+          });
+        }
+      } catch(e) {}
+    }
+
+    minions = surfaceMinions;
 
     // Deactivate surface minions of any realm whose Boss has been defeated!
     minions.forEach(m => {
@@ -1016,15 +1032,13 @@ const App = (() => {
       playerY = 120;
     }
 
-    // Ensure all 12 minions are active and roaming the map
-    if (!minions || minions.length < 12) {
+    // Ensure minions list is active and roaming
+    if (!minions || minions.length === 0) {
       initAdventureMinions();
     }
     minions.forEach(m => {
       if (!inDungeon && player.defeatedBosses && player.defeatedBosses[m.subject]) {
         m.active = false;
-      } else {
-        m.active = true;
       }
     });
 
@@ -1144,6 +1158,7 @@ const App = (() => {
         }
         const dist = Math.hypot(playerX - m.x, playerY - m.y);
         if (dist < 25) {
+          preBattleCoords = { x: playerX, y: playerY, inDungeon, activeDungeonId };
           lastCollidedMinionId = m.id;
           player.subject = m.subject;
           stopMapLoop();
@@ -1159,10 +1174,8 @@ const App = (() => {
           if (!checkObstacleCollision(targetX, targetY, 15)) {
             playerX = targetX;
             playerY = targetY;
-          } else {
-            const coords = getSpawnCoords(player.element);
-            playerX = coords.x;
-            playerY = coords.y;
+            preBattleCoords.x = targetX;
+            preBattleCoords.y = targetY;
           }
           
           window.BattleEngine.initBattle(player, m.subject, false, m.name, !!m.isSpecial);
@@ -1179,6 +1192,7 @@ const App = (() => {
         
         const dist = Math.hypot(playerX - b.x, playerY - b.y);
         if (dist < 32) {
+          preBattleCoords = { x: playerX, y: playerY, inDungeon, activeDungeonId };
           player.subject = b.subject;
           stopMapLoop();
           
@@ -1193,10 +1207,8 @@ const App = (() => {
           if (!checkObstacleCollision(targetBossX, targetBossY, 15)) {
             playerX = targetBossX;
             playerY = targetBossY;
-          } else {
-            const coords = getSpawnCoords(player.element);
-            playerX = coords.x;
-            playerY = coords.y;
+            preBattleCoords.x = targetBossX;
+            preBattleCoords.y = targetBossY;
           }
           
           window.HiggsfieldEngine.triggerBossIntro(b.subject, () => {
@@ -2036,7 +2048,14 @@ const App = (() => {
         inMarket = false;
         playerX = marketReturnCoords.x || 450;
         playerY = marketReturnCoords.y || 220;
+      } else if (preBattleCoords && preBattleCoords.x) {
+        playerX = preBattleCoords.x;
+        playerY = preBattleCoords.y;
+        inDungeon = !!preBattleCoords.inDungeon;
+        activeDungeonId = preBattleCoords.activeDungeonId;
+        preBattleCoords = null; // Clear pre-battle coords after restoring position
       }
+      initAdventureMinions();
     }
 
     const screens = document.querySelectorAll('.screen');
@@ -2436,13 +2455,16 @@ const App = (() => {
   };
 
   const updateMapProgression = () => {
-    // Disable last collided minion if we won a battle
+    // Disable last collided minion if we won or captured a battle
     if (lastCollidedMinionId) {
       const minion = minions.find(m => m.id === lastCollidedMinionId);
       if (minion) {
         minion.active = false;
-        // Save minions state
-        localStorage.setItem('knowledge_quest_minions', JSON.stringify(minions));
+        // Save surface minions active states
+        if (!inDungeon && surfaceMinions) {
+          const stateToSave = surfaceMinions.map(m => ({ id: m.id, active: m.active }));
+          localStorage.setItem('knowledge_quest_surface_minions', JSON.stringify(stateToSave));
+        }
       }
       lastCollidedMinionId = null;
     }
