@@ -599,16 +599,6 @@ const App = (() => {
       }
     }
 
-    // 2. Chasm Ledge Physics for Option D (Shattered Continent Chasms across 3600x1760)
-    // Central Stone Crossroads Bridge is at X: 1720..1880, Y: 810..950
-    const onBridge = (x >= 1720 && x <= 1880 && y >= 810 && y <= 950);
-    if (!onBridge) {
-      // Vertical Energy Chasm (X: 1760..1840)
-      if (x > 1760 && x < 1840) return true;
-      // Horizontal Energy Chasm (Y: 840..920)
-      if (y > 840 && y < 920) return true;
-    }
-
     // 3. Central Obelisk Monument Base Check (X: 1800, Y: 880, radius: 55)
     const coreDist = Math.hypot(x - 1800, y - 880);
     if (coreDist < r + 55) return true;
@@ -1139,11 +1129,17 @@ const App = (() => {
         m.x += m.vx;
         m.y += m.vy;
         
-        let minX = 20; let maxX = 1780; let minY = 20; let maxY = 860;
-        if (m.subject === 'math') { minX = 50; maxX = 850; minY = 50; maxY = 390; }
-        else if (m.subject === 'chem') { minX = 950; maxX = 1750; minY = 50; maxY = 390; }
-        else if (m.subject === 'bio') { minX = 50; maxX = 850; minY = 490; maxY = 830; }
-        else if (m.subject === 'phys') { minX = 950; maxX = 1750; minY = 490; maxY = 830; }
+        let minX = 60; let maxX = 3540; let minY = 60; let maxY = 1700;
+        if (!inDungeon) {
+          // Monsters/minions strictly bound to roam inside their own type region quadrant
+          if (m.subject === 'math') { minX = 80; maxX = 1720; minY = 80; maxY = 810; }
+          else if (m.subject === 'chem') { minX = 1880; maxX = 3520; minY = 80; maxY = 810; }
+          else if (m.subject === 'bio') { minX = 80; maxX = 1720; minY = 950; maxY = 1680; }
+          else if (m.subject === 'phys') { minX = 1880; maxX = 3520; minY = 950; maxY = 1680; }
+        } else {
+          // Dungeons room bounds regardless of type
+          minX = 60; maxX = 1740; minY = 60; maxY = 820;
+        }
         
         if (m.x < minX || m.x > maxX) { m.vx = -m.vx; m.x = Math.max(minX, Math.min(maxX, m.x)); }
         if (m.y < minY || m.y > maxY) { m.vy = -m.vy; m.y = Math.max(minY, Math.min(maxY, m.y)); }
