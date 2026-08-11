@@ -2397,6 +2397,9 @@ const App = (() => {
     player.pets.forEach(pet => {
       const card = document.createElement('div');
       card.className = "pet-card";
+      if (pet.isNew) {
+        card.classList.add('new-ally-card');
+      }
       
       const isActive = player.activePet && player.activePet.name === pet.name;
       if (isActive) {
@@ -2418,6 +2421,7 @@ const App = (() => {
       const petSpriteSrc = getPetSpriteSrc(pet);
 
       card.innerHTML = `
+        ${pet.isNew ? `<span class="new-ally-badge">NEW!</span>` : ''}
         <div style="position: relative; width: 54px; height: 54px; border-radius: 50%; overflow: hidden; margin: 0 auto 8px; border: 2px solid ${isActive ? '#4ade80' : 'rgba(255,255,255,0.2)'}; box-shadow: 0 4px 12px rgba(0,0,0,0.5);">
           <img src="${petSpriteSrc}" alt="${pet.name}" style="width: 100%; height: 100%; object-fit: cover;">
           ${isSpecialPet ? `<span style="position: absolute; top: 0; right: 0; font-size: 0.9rem; filter: drop-shadow(0 0 6px #fbbf24);">⭐</span>` : ''}
@@ -2435,19 +2439,24 @@ const App = (() => {
       card.addEventListener('click', () => {
         if (window.AudioEngine) window.AudioEngine.playClick();
         
+        // Clear isNew flag on this specific ally when clicked!
+        if (pet.isNew) {
+          pet.isNew = false;
+        }
+
         if (isActive) {
           player.activePet = null;
         } else {
           // Strictly 1 active pet at a time! Replaces previous active pet.
           player.activePet = pet;
+          player.hp = player.hpMax; // Refill HP when activating health-granting allies!
+          player.mp = player.mpMax;
         }
         
         recalculateStats();
-        player.hp = player.hpMax; // Refill HP when activating health-granting allies!
-        player.mp = player.mpMax;
         saveState();
-        renderAlliesList();
         updateHUD();
+        renderAlliesList();
       });
 
       container.appendChild(card);
@@ -2549,6 +2558,17 @@ const App = (() => {
 
     // Apply color robe filter
     applyRobeFilter(player.hue);
+
+    // Toggle notification dot on nav-allies tab button if any new unclicked ally exists
+    const hasUnseenAlly = player.pets && player.pets.some(p => p.isNew);
+    const alliesBadge = document.getElementById('allies-nav-badge');
+    if (alliesBadge) {
+      if (hasUnseenAlly) {
+        alliesBadge.classList.remove('hidden');
+      } else {
+        alliesBadge.classList.add('hidden');
+      }
+    }
 
     // Sync dashboard customizer selectors
     const dashBtns = document.querySelectorAll('#dash-avatar-grid .avatar-option-btn');

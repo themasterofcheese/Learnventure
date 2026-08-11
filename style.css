@@ -2479,3 +2479,52 @@ input[type="range"] {
   0% { transform: translate(-2px, 0); }
   100% { transform: translate(2px, 0); }
 }
+
+/* ==========================================================================
+   ALLIES TAB NOTIFICATION SIGNAL & BADGE
+   ========================================================================== */
+.nav-notification-dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 11px;
+  height: 11px;
+  background: #ef4444;
+  border: 2px solid #0f172a;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #ef4444, 0 0 16px #f87171;
+  animation: navBadgePulse 1s infinite alternate ease-in-out;
+  pointer-events: none;
+}
+
+@keyframes navBadgePulse {
+  0% { transform: scale(0.9); box-shadow: 0 0 6px #ef4444; }
+  100% { transform: scale(1.35); box-shadow: 0 0 16px #ef4444, 0 0 24px #f87171; }
+}
+
+/* New Ally Card & Badge Styling */
+.pet-card.new-ally-card {
+  border-color: #a855f7 !important;
+  box-shadow: 0 0 20px rgba(168, 85, 247, 0.45) !important;
+  animation: newCardGlow 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes newCardGlow {
+  0% { box-shadow: 0 0 15px rgba(168, 85, 247, 0.3); }
+  100% { box-shadow: 0 0 25px rgba(168, 85, 247, 0.7), 0 0 35px rgba(56, 189, 248, 0.4); }
+}
+
+.new-ally-badge {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: linear-gradient(135deg, #ef4444, #a855f7);
+  color: #ffffff;
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+  letter-spacing: 0.5px;
+  animation: badgePulse 1s infinite alternate;
+}

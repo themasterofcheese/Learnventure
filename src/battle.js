@@ -1214,7 +1214,8 @@ const BattleEngine = (() => {
       subject: realmSubject,
       sprite: petSpritePath,
       level: enemy.level,
-      isSpecial: !!enemy.isSpecial
+      isSpecial: !!enemy.isSpecial,
+      isNew: true
     };
 
     if (!player.pets) player.pets = [];
@@ -1223,6 +1224,9 @@ const BattleEngine = (() => {
     const duplicate = player.pets.some(p => p.name === petObj.name);
     if (!duplicate) {
       player.pets.push(petObj);
+    } else {
+      const existing = player.pets.find(p => p.name === petObj.name);
+      if (existing) existing.isNew = true;
     }
     
     document.getElementById('battle-announcer').innerText = `🔮 BLACK HOLE ABSORPTION! You captured ${petObj.name}!`;
