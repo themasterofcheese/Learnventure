@@ -106,22 +106,42 @@ window.TileMap = (() => {
             };
         }
 
-        updateFogFrame(wx, wy, radiusTiles = 7) {
+        updateFogFrame(wx, wy, radiusTiles = 8) {
             const center = this.worldToTile(wx, wy);
             const dirtyChunks = new Set();
-            
             const rSq = radiusTiles * radiusTiles;
 
-            for (let y = 0; y < GRID_H; y++) {
-                for (let x = 0; x < GRID_W; x++) {
-                    const i = this.idx(x, y);
-                    if (this.explored[i] === 2) {
-                        this.explored[i] = 1;
-                        dirtyChunks.add(`${Math.floor(x/CHUNK_TILES)},${Math.floor(y/CHUNK_TILES)}`);
+            // Demote previous visible tiles to explored (1)
+            if (this.lastCenter) {
+                const lc = this.lastCenter;
+                const prevRad = radiusTiles + 2;
+                for (let y = Math.max(0, lc.ty - prevRad); y <= Math.min(GRID_H - 1, lc.ty + prevRad); y++) {
+                    for (let x = Math.max(0, lc.tx - prevRad); x <= Math.min(GRID_W - 1, lc.tx + prevRad); x++) {
+                        const i = this.idx(x, y);
+                        if (this.explored[i] === 2) {
+                            this.explored[i] = 1;
+                            const cx = Math.floor(x / CHUNK_TILES);
+                            const cy = Math.floor(y / CHUNK_TILES);
+                            dirtyChunks.add(cy * CHUNKS_X + cx);
+                        }
+                    }
+                }
+            } else {
+                for (let y = 0; y < GRID_H; y++) {
+                    for (let x = 0; x < GRID_W; x++) {
+                        const i = this.idx(x, y);
+                        if (this.explored[i] === 2) {
+                            this.explored[i] = 1;
+                            const cx = Math.floor(x / CHUNK_TILES);
+                            const cy = Math.floor(y / CHUNK_TILES);
+                            dirtyChunks.add(cy * CHUNKS_X + cx);
+                        }
                     }
                 }
             }
+            this.lastCenter = center;
 
+            // Promote tiles in radius to visible (2)
             for (let y = Math.max(0, center.ty - radiusTiles); y <= Math.min(GRID_H - 1, center.ty + radiusTiles); y++) {
                 for (let x = Math.max(0, center.tx - radiusTiles); x <= Math.min(GRID_W - 1, center.tx + radiusTiles); x++) {
                     const dx = x - center.tx;
@@ -129,14 +149,16 @@ window.TileMap = (() => {
                     if (dx * dx + dy * dy <= rSq) {
                         const i = this.idx(x, y);
                         this.explored[i] = 2;
-                        dirtyChunks.add(`${Math.floor(x/CHUNK_TILES)},${Math.floor(y/CHUNK_TILES)}`);
+                        const cx = Math.floor(x / CHUNK_TILES);
+                        const cy = Math.floor(y / CHUNK_TILES);
+                        dirtyChunks.add(cy * CHUNKS_X + cx);
                     }
                 }
             }
             return dirtyChunks;
         }
 
-        save(key = 'learnventure_tilemap_v2') {
+        save(key = 'learnventure_tilemap_v3') {
             try {
                 const data = {
                     types: Array.from(this.types),
@@ -151,7 +173,7 @@ window.TileMap = (() => {
             }
         }
 
-        load(key = 'learnventure_tilemap_v2') {
+        load(key = 'learnventure_tilemap_v3') {
             try {
                 const dataStr = localStorage.getItem(key);
                 if (!dataStr) return false;

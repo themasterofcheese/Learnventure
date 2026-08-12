@@ -1026,13 +1026,20 @@ const App = (() => {
     // === TILE WORLD INIT ===
     if (window.TileMap && !tileGrid) {
       tileGrid = new window.TileMap.TileGrid();
-      const loaded = tileGrid.load();
+      const loaded = tileGrid.load('learnventure_tilemap_v3');
       if (!loaded && window.WorldGen) {
         console.log('[TileMap] Generating world from seed', window.WorldGen.WORLD_SEED);
         tileWaypoints = window.WorldGen.generateWorld(tileGrid);
-        tileGrid.save();
+        tileGrid.save('learnventure_tilemap_v3');
       }
-      if (window.TileRenderer) window.TileRenderer.init(tileGrid);
+      if (window.TileRenderer) {
+        window.TileRenderer.init(tileGrid);
+        // Reveal fog around current player position immediately
+        const dirtyChunks = tileGrid.updateFogFrame(playerX, playerY, 16);
+        if (dirtyChunks && dirtyChunks.size > 0) {
+          dirtyChunks.forEach(ci => window.TileRenderer.chunkCache.markDirty(ci));
+        }
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown);
@@ -1121,9 +1128,9 @@ const App = (() => {
     }
 
     // Update fog of war around player (surface world only)
-    if (tileGrid && !inDungeon && !inMarket && isMoving) {
-      const dirtyChunks = tileGrid.updateFogFrame(playerX, playerY, 7);
-      if (window.TileRenderer && dirtyChunks.size > 0) {
+    if (tileGrid && !inDungeon && !inMarket) {
+      const dirtyChunks = tileGrid.updateFogFrame(playerX, playerY, 8);
+      if (window.TileRenderer && dirtyChunks && dirtyChunks.size > 0) {
         dirtyChunks.forEach(ci => window.TileRenderer.chunkCache.markDirty(ci));
       }
     }
@@ -1429,8 +1436,8 @@ const App = (() => {
       // SURFACE WORLD: Tile-based terrain + 3D WebGL overlay
       // ----------------------------------------------------
       if (window.TileRenderer && tileGrid) {
-        // Render all visible tile chunks (base terrain + decorations + fog of war)
-        window.TileRenderer.renderVisibleChunks(ctx, tileGrid, camX, camY, viewW, viewH);
+        // Pass zoom and player world coordinates for smooth radial vision light mask
+        window.TileRenderer.renderVisibleChunks(ctx, tileGrid, camX, camY, viewW, viewH, zoom, playerX, playerY);
       } else if (shatteredContinentBgImg && shatteredContinentBgImg.complete && shatteredContinentBgImg.naturalWidth !== 0) {
         ctx.drawImage(shatteredContinentBgImg, 0, 0, 3600, 1760);
       } else {
@@ -1530,77 +1537,79 @@ const App = (() => {
         }
       });
 
-      // Environment Obstacles Drawing with Organic Shapes & Textures (No Glowing Outlines, No Flat Boxes)
-      obstacles.forEach(obs => {
-        const img = obsSprites[obs.label];
-        
-        ctx.save();
-        
-        // Define organic non-rectangular shape clip paths
-        ctx.beginPath();
-        if (obs.label === 'peaks') {
-          // Jagged Mountain Rock Cluster
-          ctx.moveTo(obs.x + obs.w * 0.08, obs.y + obs.h);
-          ctx.lineTo(obs.x + obs.w * 0.22, obs.y + obs.h * 0.12);
-          ctx.lineTo(obs.x + obs.w * 0.42, obs.y + obs.h * 0.55);
-          ctx.lineTo(obs.x + obs.w * 0.65, obs.y + obs.h * 0.08);
-          ctx.lineTo(obs.x + obs.w * 0.88, obs.y + obs.h * 0.68);
-          ctx.lineTo(obs.x + obs.w, obs.y + obs.h);
-          ctx.closePath();
-        } else if (obs.label === 'ruins') {
-          // Round Hexagonal Stone Fortress Ruins
-          ctx.ellipse(obs.x + obs.w/2, obs.y + obs.h/2, obs.w/2, obs.h/2, 0, 0, Math.PI * 2);
-        } else if (obs.label === 'swamp') {
-          // Smooth Curved Mangrove Boulder Canopy
-          ctx.moveTo(obs.x + 16, obs.y);
-          ctx.quadraticCurveTo(obs.x + obs.w/2, obs.y - 10, obs.x + obs.w - 16, obs.y);
-          ctx.quadraticCurveTo(obs.x + obs.w + 10, obs.y + obs.h/2, obs.x + obs.w - 16, obs.y + obs.h);
-          ctx.quadraticCurveTo(obs.x + obs.w/2, obs.y + obs.h + 10, obs.x + 16, obs.y + obs.h);
-          ctx.quadraticCurveTo(obs.x - 10, obs.y + obs.h/2, obs.x + 16, obs.y);
-          ctx.closePath();
-        } else {
-          // Angular Power Monolith Monoliths (dynamo)
-          ctx.moveTo(obs.x + obs.w * 0.18, obs.y);
-          ctx.lineTo(obs.x + obs.w * 0.82, obs.y);
-          ctx.lineTo(obs.x + obs.w, obs.y + obs.h * 0.45);
-          ctx.lineTo(obs.x + obs.w * 0.82, obs.y + obs.h);
-          ctx.lineTo(obs.x + obs.w * 0.18, obs.y + obs.h);
-          ctx.lineTo(obs.x, obs.y + obs.h * 0.55);
-          ctx.closePath();
-        }
-
-        // Ground Drop Shadow
-        ctx.fillStyle = 'rgba(2, 6, 23, 0.55)';
-        ctx.fill();
-
-        ctx.clip(); // Clip rich texture to organic shape silhouette
-
-        if (img && img.complete && img.naturalWidth !== 0) {
-          ctx.drawImage(img, obs.x, obs.y, obs.w, obs.h);
-        } else {
-          ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
-          ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
-        }
-        
-        // Inner shadow vignette for depth
-        ctx.fillStyle = 'rgba(2, 6, 23, 0.22)';
-        ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
-
-        ctx.restore();
-
-        // X-Ray Occlusion Highlight (Diablo & Don't Starve style: player silhouetted glow behind 3D structures)
-        if (playerY + 12 < obs.y + obs.h && playerX >= obs.x - 20 && playerX <= obs.x + obs.w + 20 && playerY >= obs.y - (obs.height || 60)) {
+      // Legacy obstacles drawing (only rendered if procedural tile grid is not active)
+      if (!tileGrid) {
+        obstacles.forEach(obs => {
+          const img = obsSprites[obs.label];
+          
           ctx.save();
-          ctx.globalAlpha = 0.60;
-          ctx.font = 'bold 24px Outfit';
-          ctx.textAlign = 'center';
-          ctx.fillStyle = '#38bdf8';
-          ctx.shadowColor = '#0284c7';
-          ctx.shadowBlur = 14;
-          ctx.fillText('🧙‍♂️', playerX, playerY + bobY - playerZ + 8);
+          
+          // Define organic non-rectangular shape clip paths
+          ctx.beginPath();
+          if (obs.label === 'peaks') {
+            // Jagged Mountain Rock Cluster
+            ctx.moveTo(obs.x + obs.w * 0.08, obs.y + obs.h);
+            ctx.lineTo(obs.x + obs.w * 0.22, obs.y + obs.h * 0.12);
+            ctx.lineTo(obs.x + obs.w * 0.42, obs.y + obs.h * 0.55);
+            ctx.lineTo(obs.x + obs.w * 0.65, obs.y + obs.h * 0.08);
+            ctx.lineTo(obs.x + obs.w * 0.88, obs.y + obs.h * 0.68);
+            ctx.lineTo(obs.x + obs.w, obs.y + obs.h);
+            ctx.closePath();
+          } else if (obs.label === 'ruins') {
+            // Round Hexagonal Stone Fortress Ruins
+            ctx.ellipse(obs.x + obs.w/2, obs.y + obs.h/2, obs.w/2, obs.h/2, 0, 0, Math.PI * 2);
+          } else if (obs.label === 'swamp') {
+            // Smooth Curved Mangrove Boulder Canopy
+            ctx.moveTo(obs.x + 16, obs.y);
+            ctx.quadraticCurveTo(obs.x + obs.w/2, obs.y - 10, obs.x + obs.w - 16, obs.y);
+            ctx.quadraticCurveTo(obs.x + obs.w + 10, obs.y + obs.h/2, obs.x + obs.w - 16, obs.y + obs.h);
+            ctx.quadraticCurveTo(obs.x + obs.w/2, obs.y + obs.h + 10, obs.x + 16, obs.y + obs.h);
+            ctx.quadraticCurveTo(obs.x - 10, obs.y + obs.h/2, obs.x + 16, obs.y);
+            ctx.closePath();
+          } else {
+            // Angular Power Monolith Monoliths (dynamo)
+            ctx.moveTo(obs.x + obs.w * 0.18, obs.y);
+            ctx.lineTo(obs.x + obs.w * 0.82, obs.y);
+            ctx.lineTo(obs.x + obs.w, obs.y + obs.h * 0.45);
+            ctx.lineTo(obs.x + obs.w * 0.82, obs.y + obs.h);
+            ctx.lineTo(obs.x + obs.w * 0.18, obs.y + obs.h);
+            ctx.lineTo(obs.x, obs.y + obs.h * 0.55);
+            ctx.closePath();
+          }
+
+          // Ground Drop Shadow
+          ctx.fillStyle = 'rgba(2, 6, 23, 0.55)';
+          ctx.fill();
+
+          ctx.clip(); // Clip rich texture to organic shape silhouette
+
+          if (img && img.complete && img.naturalWidth !== 0) {
+            ctx.drawImage(img, obs.x, obs.y, obs.w, obs.h);
+          } else {
+            ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
+            ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+          }
+          
+          // Inner shadow vignette for depth
+          ctx.fillStyle = 'rgba(2, 6, 23, 0.22)';
+          ctx.fillRect(obs.x, obs.y, obs.w, obs.h);
+
           ctx.restore();
-        }
-      });
+
+          // X-Ray Occlusion Highlight (Diablo & Don't Starve style: player silhouetted glow behind 3D structures)
+          if (playerY + 12 < obs.y + obs.h && playerX >= obs.x - 20 && playerX <= obs.x + obs.w + 20 && playerY >= obs.y - (obs.height || 60)) {
+            ctx.save();
+            ctx.globalAlpha = 0.60;
+            ctx.font = 'bold 24px Outfit';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#38bdf8';
+            ctx.shadowColor = '#0284c7';
+            ctx.shadowBlur = 14;
+            ctx.fillText('🧙‍♂️', playerX, playerY + bobY - playerZ + 8);
+            ctx.restore();
+          }
+        });
+      }
 
       // Central Core Obelisk Monument at (1800, 880)
       const pulse = 55 + Math.sin(Date.now() / 200) * 5;
