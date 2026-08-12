@@ -1070,6 +1070,15 @@ const App = (() => {
   };
 
   const updateMapFrame = (canvas, ctx) => {
+    const canvas3D = document.getElementById('adventure-canvas-3d');
+    if (canvas3D) {
+      if (inDungeon || inMarket) {
+        canvas3D.style.display = 'none';
+      } else {
+        canvas3D.style.display = 'block';
+      }
+    }
+
     const is3DActive = !!(window.World3DEngine && window.THREE);
     // 1. Move player
     let dx = 0; let dy = 0;
@@ -1615,23 +1624,32 @@ const App = (() => {
       // ----------------------------------------------------
       // SUBTERRANEAN STONE DUNGEON WORLD (1800x880)
       // ----------------------------------------------------
-      if (dungeonBgImg && dungeonBgImg.complete && dungeonBgImg.naturalWidth !== 0) {
-        ctx.drawImage(dungeonBgImg, 0, 0, 1800, 880);
-        ctx.fillStyle = 'rgba(2, 6, 23, 0.45)';
-        ctx.fillRect(0, 0, 1800, 880);
-      } else {
-        ctx.fillStyle = '#0f172a';
-        ctx.fillRect(0, 0, 1800, 880);
-      }
+      // Subterranean Stone Tile Floor & Chamber Architecture
+      ctx.fillStyle = '#090d16';
+      ctx.fillRect(0, 0, 1800, 880);
 
-      // Dungeon Grid lines
-      ctx.strokeStyle = 'rgba(234, 88, 12, 0.06)';
-      ctx.lineWidth = 1;
-      for (let i = 0; i < 1800; i += 60) {
-        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 880); ctx.stroke();
-      }
-      for (let j = 0; j < 880; j += 60) {
-        ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(1800, j); ctx.stroke();
+      // Render Subterranean Stone Floor Tiles (60x60px)
+      const tileSize = 60;
+      for (let ty = 0; ty < 880; ty += tileSize) {
+        for (let tx = 0; tx < 1800; tx += tileSize) {
+          const isEdge = (tx < 60 || tx >= 1740 || ty < 60 || ty >= 820);
+          if (isEdge) {
+            // Chiseled Subterranean Cave Perimeter Wall
+            ctx.fillStyle = '#1e1b4b';
+            ctx.fillRect(tx, ty, tileSize, tileSize);
+            ctx.strokeStyle = 'rgba(99, 102, 241, 0.3)';
+            ctx.lineWidth = 1;
+            ctx.strokeRect(tx, ty, tileSize, tileSize);
+          } else {
+            // Subterranean Stone Floor Chamber Slab
+            const n = Math.abs(Math.sin((tx * 12.5 + ty * 31.2) * 0.05));
+            ctx.fillStyle = `hsl(220, 20%, ${10 + n * 5 | 0}%)`;
+            ctx.fillRect(tx, ty, tileSize, tileSize);
+            ctx.strokeStyle = 'rgba(148, 163, 184, 0.1)';
+            ctx.lineWidth = 0.8;
+            ctx.strokeRect(tx, ty, tileSize, tileSize);
+          }
+        }
       }
 
       // Torch Sconces Ambient Light Effects
@@ -1641,12 +1659,16 @@ const App = (() => {
       ];
       torches.forEach(t => {
         const tFlicker = Math.sin(Date.now() / 80 + t.x) * 4;
-        const tGrad = ctx.createRadialGradient(t.x, t.y, 2, t.x, t.y, 45 + tFlicker);
-        tGrad.addColorStop(0, 'rgba(251, 146, 60, 0.5)');
-        tGrad.addColorStop(0.5, 'rgba(234, 88, 12, 0.2)');
+        const tGrad = ctx.createRadialGradient(t.x, t.y, 2, t.x, t.y, 55 + tFlicker);
+        tGrad.addColorStop(0, 'rgba(251, 146, 60, 0.6)');
+        tGrad.addColorStop(0.5, 'rgba(234, 88, 12, 0.25)');
         tGrad.addColorStop(1, 'transparent');
         ctx.fillStyle = tGrad;
-        ctx.beginPath(); ctx.arc(t.x, t.y, 45 + tFlicker, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(t.x, t.y, 55 + tFlicker, 0, Math.PI * 2); ctx.fill();
+
+        // Torch Wall Sconce Icon
+        ctx.fillStyle = '#fb923c';
+        ctx.beginPath(); ctx.arc(t.x, t.y, 4, 0, Math.PI * 2); ctx.fill();
       });
 
       // Distinct Dungeon Title Banner
