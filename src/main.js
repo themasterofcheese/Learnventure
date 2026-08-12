@@ -587,38 +587,24 @@ const App = (() => {
       return false;
     }
 
-    // 1. Solid Outer Boundary Cliff Walls (3600x1760 World Boundaries)
+    // 1. Outer Perimeter Cliff Boundary Walls (3600x1760 Map Edges)
     if (x <= 60 || x >= 3540 || y <= 60 || y >= 1700) {
       return true;
     }
 
-    // 2. Tile-based walkability collision (lava, acid pools, crystal walls, swamp water, chasms)
+    // 2. Tile-based solid obstacle collision (only explicit mountain walls, crystal monoliths, and deep chasms)
     if (tileGrid) {
       const { tx, ty } = tileGrid.worldToTile(x, y);
-      if (!tileGrid.isWalkable(tx, ty)) return true;
-    }
-
-    // 3. 3D Terrain Height-Slope Cliff Collision (outer mountain walls only)
-    if (window.World3DEngine) {
-      const map3DX = ((x / 3600) * 180) - 90;
-      const map3DZ = ((y / 1760) * 80) - 40;
-      const tH = window.World3DEngine.getTerrainHeight(map3DX, map3DZ);
-      if (tH > 18.0) {
+      const type = tileGrid.getType(tx, ty);
+      if (type === 'wall' || type === 'chasm' || type === 'crystal_rock') {
         return true;
       }
     }
 
-    // 4. Central Obelisk Monument Base Check (X: 1800, Y: 880, radius: 55)
+    // 3. Central Aether Core Obelisk Monument (X: 1800, Y: 880, radius: 55)
     const coreDist = Math.hypot(x - 1800, y - 880);
     if (coreDist < r + 55) return true;
 
-    // 5. 3D Obstacle Footprint Collision Check (hardcoded obstacles as secondary layer)
-    for (let obs of obstacles) {
-      const closestX = Math.max(obs.x, Math.min(x, obs.x + obs.w));
-      const closestY = Math.max(obs.y, Math.min(y, obs.y + obs.h));
-      const dist = Math.hypot(x - closestX, y - closestY);
-      if (dist < r) return true;
-    }
     return false;
   };
 
@@ -1026,11 +1012,11 @@ const App = (() => {
     // === TILE WORLD INIT ===
     if (window.TileMap && !tileGrid) {
       tileGrid = new window.TileMap.TileGrid();
-      const loaded = tileGrid.load('learnventure_tilemap_v3');
+      const loaded = tileGrid.load('learnventure_tilemap_v4');
       if (!loaded && window.WorldGen) {
         console.log('[TileMap] Generating world from seed', window.WorldGen.WORLD_SEED);
         tileWaypoints = window.WorldGen.generateWorld(tileGrid);
-        tileGrid.save('learnventure_tilemap_v3');
+        tileGrid.save('learnventure_tilemap_v4');
       }
       if (window.TileRenderer) {
         window.TileRenderer.init(tileGrid);
