@@ -272,6 +272,10 @@ const App = (() => {
   let surfaceMinions = [];
   let minions = [];
   let particles = [];
+
+  // === TILE MAP SYSTEM ===
+  let tileGrid = null; // TileGrid instance, initialized in startMapLoop
+  let tileWaypoints = null; // boss/dungeon world-pixel locations from worldgen
   
   // Market Realm State & Stationary Merchant Entities
   let inMarket = false;
@@ -583,27 +587,32 @@ const App = (() => {
       return false;
     }
 
-    // 1. Solid Outer Boundary Cliff Walls (3600x1760 World Boundaries - Player Cannot Go Off Map Edges)
+    // 1. Solid Outer Boundary Cliff Walls (3600x1760 World Boundaries)
     if (x <= 60 || x >= 3540 || y <= 60 || y >= 1700) {
       return true;
     }
 
-    // 2. 3D Terrain Height-Slope Cliff Collision (Steep Rock Cliffs Cannot Be Walked Over)
+    // 2. Tile-based walkability collision (lava, acid pools, crystal walls, swamp water, chasms)
+    if (tileGrid) {
+      const { tx, ty } = tileGrid.worldToTile(x, y);
+      if (!tileGrid.isWalkable(tx, ty)) return true;
+    }
+
+    // 3. 3D Terrain Height-Slope Cliff Collision (outer mountain walls only)
     if (window.World3DEngine) {
       const map3DX = ((x / 3600) * 180) - 90;
       const map3DZ = ((y / 1760) * 80) - 40;
       const tH = window.World3DEngine.getTerrainHeight(map3DX, map3DZ);
-      // Impassable outer mountain walls
       if (tH > 18.0) {
         return true;
       }
     }
 
-    // 3. Central Obelisk Monument Base Check (X: 1800, Y: 880, radius: 55)
+    // 4. Central Obelisk Monument Base Check (X: 1800, Y: 880, radius: 55)
     const coreDist = Math.hypot(x - 1800, y - 880);
     if (coreDist < r + 55) return true;
 
-    // 4. 3D Obstacle Footprint Collision Check
+    // 5. 3D Obstacle Footprint Collision Check (hardcoded obstacles as secondary layer)
     for (let obs of obstacles) {
       const closestX = Math.max(obs.x, Math.min(x, obs.x + obs.w));
       const closestY = Math.max(obs.y, Math.min(y, obs.y + obs.h));
@@ -612,6 +621,7 @@ const App = (() => {
     }
     return false;
   };
+
 
   const dungeonChestsDatabase = {
     dungeon_math: [
@@ -1012,7 +1022,19 @@ const App = (() => {
     const canvas = document.getElementById('adventure-canvas');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    
+
+    // === TILE WORLD INIT ===
+    if (window.TileMap && !tileGrid) {
+      tileGrid = new window.TileMap.TileGrid();
+      const loaded = tileGrid.load();
+      if (!loaded && window.WorldGen) {
+        console.log('[TileMap] Generating world from seed', window.WorldGen.WORLD_SEED);
+        tileWaypoints = window.WorldGen.generateWorld(tileGrid);
+        tileGrid.save();
+      }
+      if (window.TileRenderer) window.TileRenderer.init(tileGrid);
+    }
+
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     setupDpadEvents();
@@ -1043,6 +1065,7 @@ const App = (() => {
     }, 1000 / 60);
   };
 
+
   const stopMapLoop = () => {
     if (mapInterval) {
       clearInterval(mapInterval);
@@ -1072,6 +1095,16 @@ const App = (() => {
     const bobY = isMoving ? (pWalkFrame === 0 ? -3 : 3) : Math.sin(Date.now() / 400) * 1.0;
     
     // Check independent axis movements for smooth sliding collisions (3600x1760 4x World Bounds)
+    // Apply tile-based speed modifier: path = 1.3×, swamp = 0.6×
+    let speedMult = 1.0;
+    if (tileGrid && !inDungeon && !inMarket) {
+      const { tx, ty } = tileGrid.worldToTile(playerX, playerY);
+      if (tileGrid.isFast(tx, ty)) speedMult = 1.3;
+      else if (tileGrid.isSlow(tx, ty)) speedMult = 0.6;
+    }
+    dx *= speedMult;
+    dy *= speedMult;
+
     let nextX = playerX + dx;
     let nextY = playerY + dy;
     
@@ -1086,6 +1119,15 @@ const App = (() => {
     if (!checkObstacleCollision(playerX, nextY, 15)) {
       playerY = nextY;
     }
+
+    // Update fog of war around player (surface world only)
+    if (tileGrid && !inDungeon && !inMarket && isMoving) {
+      const dirtyChunks = tileGrid.updateFogFrame(playerX, playerY, 7);
+      if (window.TileRenderer && dirtyChunks.size > 0) {
+        dirtyChunks.forEach(ci => window.TileRenderer.chunkCache.markDirty(ci));
+      }
+    }
+
     
     // 1b. 3D Jump Physics (Z-axis elevation & gravity)
     if (playerZ > 0 || playerVZ > 0) {
@@ -1119,31 +1161,77 @@ const App = (() => {
     particles = particles.filter(p => p.alpha > 0);
     
     if (!inMarket) {
-      // 3. Move Minions in their respective 900x440 quadrants
+      // 3. Move Minions — surface uses A* chase when player is close, else patrol bounce
       minions.forEach(m => {
         if (!m.active) return;
         if (!inDungeon && player.defeatedBosses && player.defeatedBosses[m.subject]) {
           m.active = false;
           return;
         }
+
+        // A* chase logic for surface minions
+        if (!inDungeon && tileGrid && window.Pathfinder) {
+          const distToPlayer = Math.hypot(playerX - m.x, playerY - m.y);
+          const CHASE_RADIUS = 320;  // ~8 tiles
+          const GIVE_UP_RADIUS = 560; // ~14 tiles
+          if (!m.pathCooldown) m.pathCooldown = 0;
+          if (!m.pathQueue) m.pathQueue = [];
+          if (!m.chasing) m.chasing = false;
+
+          if (distToPlayer < CHASE_RADIUS) {
+            m.chasing = true;
+          } else if (distToPlayer > GIVE_UP_RADIUS) {
+            m.chasing = false;
+            m.pathQueue = [];
+          }
+
+          if (m.chasing) {
+            m.pathCooldown--;
+            if (m.pathCooldown <= 0) {
+              m.pathQueue = window.Pathfinder.findPathWorld(tileGrid, m.x, m.y, playerX, playerY, 400);
+              m.pathCooldown = 120; // recompute every 2 seconds at 60fps
+            }
+            if (m.pathQueue && m.pathQueue.length > 0) {
+              const target = m.pathQueue[0];
+              const tdx = target.wx - m.x;
+              const tdy = target.wy - m.y;
+              const tdist = Math.hypot(tdx, tdy);
+              if (tdist < 8) {
+                m.pathQueue.shift();
+              } else {
+                const spd = Math.sqrt(m.vx * m.vx + m.vy * m.vy) || 1.5;
+                m.x += (tdx / tdist) * spd;
+                m.y += (tdy / tdist) * spd;
+              }
+            } else {
+              // fallback: move directly toward player
+              const spd = Math.sqrt(m.vx * m.vx + m.vy * m.vy) || 1.5;
+              const ang = Math.atan2(playerY - m.y, playerX - m.x);
+              m.x += Math.cos(ang) * spd;
+              m.y += Math.sin(ang) * spd;
+            }
+            return; // skip patrol bounce when chasing
+          }
+        }
+
+        // Patrol bounce movement
         m.x += m.vx;
         m.y += m.vy;
         
         let minX = 60; let maxX = 3540; let minY = 60; let maxY = 1700;
         if (!inDungeon) {
-          // Monsters/minions strictly bound to roam inside their own type region quadrant
           if (m.subject === 'math') { minX = 80; maxX = 1720; minY = 80; maxY = 810; }
           else if (m.subject === 'chem') { minX = 1880; maxX = 3520; minY = 80; maxY = 810; }
           else if (m.subject === 'bio') { minX = 80; maxX = 1720; minY = 950; maxY = 1680; }
           else if (m.subject === 'phys') { minX = 1880; maxX = 3520; minY = 950; maxY = 1680; }
         } else {
-          // Dungeons room bounds regardless of type
           minX = 60; maxX = 1740; minY = 60; maxY = 820;
         }
         
         if (m.x < minX || m.x > maxX) { m.vx = -m.vx; m.x = Math.max(minX, Math.min(maxX, m.x)); }
         if (m.y < minY || m.y > maxY) { m.vy = -m.vy; m.y = Math.max(minY, Math.min(maxY, m.y)); }
       });
+
 
       // 4. Collision check with minions
       for (let m of minions) {
@@ -1338,7 +1426,12 @@ const App = (() => {
       // ----------------------------------------------------
       // SURFACE WORLD MAP (3600x1760 Playable Terrain)
       // ----------------------------------------------------
-      if (shatteredContinentBgImg && shatteredContinentBgImg.complete && shatteredContinentBgImg.naturalWidth !== 0) {
+      // SURFACE WORLD: Tile-based terrain + 3D WebGL overlay
+      // ----------------------------------------------------
+      if (window.TileRenderer && tileGrid) {
+        // Render all visible tile chunks (base terrain + decorations + fog of war)
+        window.TileRenderer.renderVisibleChunks(ctx, tileGrid, camX, camY, viewW, viewH);
+      } else if (shatteredContinentBgImg && shatteredContinentBgImg.complete && shatteredContinentBgImg.naturalWidth !== 0) {
         ctx.drawImage(shatteredContinentBgImg, 0, 0, 3600, 1760);
       } else {
         const drawBiomeGround = (img, x, y, w, h, fallbackCol) => {
@@ -1928,47 +2021,29 @@ const App = (() => {
     ctx.restore();
 
     // ----------------------------------------------------
-    // FIXED SCREEN HUD: Radar Minimap (Top Right of Expanded Viewport)
+    // FIXED SCREEN HUD: Minimap (fog-of-war tile map, top right)
     // ----------------------------------------------------
     ctx.save();
-    const mmW = 135; const mmH = 68;
-    const mmX = viewW - mmW - 16; const mmY = 14;
-    
-    ctx.fillStyle = 'rgba(2, 6, 23, 0.88)';
-    ctx.strokeStyle = 'rgba(168, 85, 247, 0.55)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.roundRect(mmX, mmY, mmW, mmH, 8);
-    ctx.fill(); ctx.stroke();
-
-    // Biome dividers in minimap
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
-    ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(mmX + mmW/2, mmY); ctx.lineTo(mmX + mmW/2, mmY + mmH); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(mmX, mmY + mmH/2); ctx.lineTo(mmX + mmW, mmY + mmH/2); ctx.stroke();
-
-    // Radar scan beam effect
-    const scanX = mmX + (Date.now() / 15) % mmW;
-    ctx.fillStyle = 'rgba(168, 85, 247, 0.2)';
-    ctx.fillRect(scanX, mmY, 3, mmH);
-
-    // Player location dot
-    const pMmX = mmX + (playerX / WORLD_WIDTH) * mmW;
-    const pMmY = mmY + (playerY / WORLD_HEIGHT) * mmH;
-    ctx.fillStyle = '#ef4444';
-    ctx.beginPath(); ctx.arc(pMmX, pMmY, 3.5, 0, Math.PI * 2); ctx.fill();
-
-    // Boss locations dots
-    bosses.forEach(b => {
-      const bMmX = mmX + (b.x / WORLD_WIDTH) * mmW;
-      const bMmY = mmY + (b.y / WORLD_HEIGHT) * mmH;
-      ctx.fillStyle = '#a855f7';
-      ctx.beginPath(); ctx.arc(bMmX, bMmY, 2.5, 0, Math.PI * 2); ctx.fill();
-    });
-
-    ctx.fillStyle = '#94a3b8';
-    ctx.font = 'bold 8px Outfit';
-    ctx.textAlign = 'left';
+    ctx.setTransform(1, 0, 0, 1, 0, 0); // Draw in screen space
+    const viewW2 = canvas.width || 1150;
+    if (window.TileRenderer && tileGrid) {
+      window.TileRenderer.renderMinimap(ctx, tileGrid, playerX, playerY, bosses, viewW2);
+    } else {
+      // Fallback: original radar minimap
+      const mmW = 135; const mmH = 68;
+      const mmX = viewW2 - mmW - 16; const mmY = 14;
+      ctx.fillStyle = 'rgba(2, 6, 23, 0.88)';
+      ctx.strokeStyle = 'rgba(168, 85, 247, 0.55)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.roundRect(mmX, mmY, mmW, mmH, 8); ctx.fill(); ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,255,255,0.15)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(mmX+mmW/2, mmY); ctx.lineTo(mmX+mmW/2, mmY+mmH); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(mmX, mmY+mmH/2); ctx.lineTo(mmX+mmW, mmY+mmH/2); ctx.stroke();
+      const pMmX = mmX + (playerX / WORLD_WIDTH) * mmW;
+      const pMmY = mmY + (playerY / WORLD_HEIGHT) * mmH;
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath(); ctx.arc(pMmX, pMmY, 3.5, 0, Math.PI*2); ctx.fill();
+    }
     ctx.restore();
 
     // 3D WebGL Engine Synchronization & Render Loop
