@@ -139,11 +139,11 @@ window.WorldGen = (() => {
         if (nearestBiome.name === 'math') {
           type = n > 0.72 ? 'crystal_rock' : (n > 0.5 ? 'crystal_dense' : 'grass');
         } else if (nearestBiome.name === 'chem') {
-          type = n > 0.72 ? 'acid_pool' : (n > 0.5 ? 'lab_floor' : 'acid_ground');
+          type = n > 0.72 ? 'lava' : (n > 0.48 ? 'acid_pool' : 'acid_ground');
         } else if (nearestBiome.name === 'bio') {
           type = n > 0.72 ? 'swamp_water' : (n > 0.5 ? 'swamp' : 'jungle');
         } else if (nearestBiome.name === 'phys') {
-          type = n > 0.72 ? 'lava' : (n > 0.5 ? 'volcanic' : 'crater');
+          type = n > 0.72 ? 'volcanic' : (n > 0.48 ? 'lab_floor' : 'crater');
         }
         
         tileGrid.setType(tx, ty, type);
