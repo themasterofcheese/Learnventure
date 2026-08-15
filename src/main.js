@@ -592,11 +592,11 @@ const App = (() => {
       return true;
     }
 
-    // 2. Tile-based solid obstacle collision (only explicit mountain walls, crystal monoliths, and deep chasms)
+    // 2. Tile-based solid obstacle collision (only explicit perimeter walls and deep chasms)
     if (tileGrid) {
       const { tx, ty } = tileGrid.worldToTile(x, y);
       const type = tileGrid.getType(tx, ty);
-      if (type === 'wall' || type === 'chasm' || type === 'crystal_rock') {
+      if (type === 'wall' || type === 'chasm') {
         return true;
       }
     }

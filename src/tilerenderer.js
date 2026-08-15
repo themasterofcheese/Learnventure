@@ -118,45 +118,22 @@ window.TileRenderer = (() => {
       ctx.fillStyle = 'rgba(255, 255, 255, 0.08)'; ctx.fillRect(px, py, S, S);
     }
 
-    // 3. Render Tile Overlay Decorations
+    // 3. Optional Soft Bioluminescent Particle Highlights (Replaces crude legacy vector shapes)
     if (decorationId !== undefined && decorationId >= 0) {
       ctx.save();
       ctx.translate(px, py);
-      switch (decorationId) {
-        case 0:
-          ctx.fillStyle = 'rgba(186, 230, 253, 0.9)';
-          ctx.beginPath(); ctx.moveTo(S / 2, S * 0.2); ctx.lineTo(S * 0.6, S * 0.7); ctx.lineTo(S * 0.4, S * 0.7); ctx.closePath(); ctx.fill();
-          break;
-        case 1:
-          ctx.fillStyle = 'rgba(125, 211, 252, 0.85)';
-          [[S * 0.25, S * 0.25, S * 0.35, S * 0.7, S * 0.15, S * 0.7], [S * 0.5, S * 0.1, S * 0.62, S * 0.65, S * 0.38, S * 0.65], [S * 0.75, S * 0.28, S * 0.85, S * 0.72, S * 0.65, S * 0.72]].forEach(([ax, ay, bx, by, cx, cy]) => {
-            ctx.beginPath(); ctx.moveTo(ax, ay); ctx.lineTo(bx, by); ctx.lineTo(cx, cy); ctx.closePath(); ctx.fill();
-          });
-          break;
-        case 2:
-          ctx.strokeStyle = 'rgba(74, 222, 128, 0.7)'; ctx.lineWidth = 1.2;
-          ctx.beginPath(); ctx.arc(S * 0.4, S * 0.45, 5, 0, Math.PI * 2); ctx.stroke();
-          break;
-        case 3:
-          ctx.strokeStyle = 'rgba(134, 239, 172, 0.6)'; ctx.lineWidth = 1;
-          ctx.beginPath(); ctx.moveTo(S * 0.4, S * 0.25); ctx.lineTo(S * 0.6, S * 0.5); ctx.lineTo(S * 0.4, S * 0.75); ctx.lineTo(S * 0.2, S * 0.5); ctx.closePath(); ctx.stroke();
-          break;
-        case 4:
-          ctx.fillStyle = '#78350f'; ctx.fillRect(S * 0.43, S * 0.52, S * 0.14, S * 0.32);
-          ctx.fillStyle = '#ef4444'; ctx.beginPath(); ctx.ellipse(S / 2, S * 0.5, S * 0.22, S * 0.16, 0, 0, Math.PI * 2); ctx.fill();
-          break;
-        case 5:
-          ctx.strokeStyle = 'rgba(16, 185, 129, 0.8)'; ctx.lineWidth = 1.4;
-          ctx.beginPath(); ctx.moveTo(S / 2, S * 0.75); ctx.quadraticCurveTo(S * 0.15, S * 0.6, S * 0.1, S * 0.25); ctx.stroke();
-          break;
-        case 6:
-          ctx.fillStyle = 'rgba(180, 83, 9, 0.7)'; ctx.beginPath();
-          ctx.moveTo(S * 0.5, S * 0.2); ctx.lineTo(S * 0.72, S * 0.35); ctx.lineTo(S * 0.68, S * 0.65);
-          ctx.closePath(); ctx.fill();
-          break;
-        case 7:
-          ctx.fillStyle = 'rgba(249, 115, 22, 0.6)'; ctx.beginPath(); ctx.arc(S / 2, S / 2, 5, 0, Math.PI * 2); ctx.fill();
-          break;
+      if (decorationId === 0 || decorationId === 1) {
+        ctx.fillStyle = 'rgba(186, 230, 253, 0.4)';
+        ctx.beginPath(); ctx.arc(S * 0.4, S * 0.4, 2, 0, Math.PI * 2); ctx.fill();
+      } else if (decorationId === 2 || decorationId === 3) {
+        ctx.fillStyle = 'rgba(74, 222, 128, 0.4)';
+        ctx.beginPath(); ctx.arc(S * 0.6, S * 0.5, 2.5, 0, Math.PI * 2); ctx.fill();
+      } else if (decorationId === 4 || decorationId === 5) {
+        ctx.fillStyle = 'rgba(52, 211, 153, 0.4)';
+        ctx.beginPath(); ctx.arc(S * 0.3, S * 0.7, 2, 0, Math.PI * 2); ctx.fill();
+      } else if (decorationId === 6 || decorationId === 7) {
+        ctx.fillStyle = 'rgba(251, 146, 60, 0.4)';
+        ctx.beginPath(); ctx.arc(S * 0.5, S * 0.5, 2, 0, Math.PI * 2); ctx.fill();
       }
       ctx.restore();
     }
