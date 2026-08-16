@@ -1012,11 +1012,11 @@ const App = (() => {
     // === TILE WORLD INIT ===
     if (window.TileMap && !tileGrid) {
       tileGrid = new window.TileMap.TileGrid();
-      const loaded = tileGrid.load('learnventure_tilemap_v8');
+      const loaded = tileGrid.load('learnventure_tilemap_v9');
       if (!loaded && window.WorldGen) {
         console.log('[TileMap] Generating world from seed', window.WorldGen.WORLD_SEED);
         tileWaypoints = window.WorldGen.generateWorld(tileGrid);
-        tileGrid.save('learnventure_tilemap_v8');
+        tileGrid.save('learnventure_tilemap_v9');
       }
       if (window.TileRenderer) {
         window.TileRenderer.init(tileGrid);

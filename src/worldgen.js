@@ -100,52 +100,28 @@ window.WorldGen = (() => {
       }
     }
 
-    // 2. Voronoi biome assignment
-    const biomes = [
-      { name: 'math', x: 450, y: 220, type: 'primary' },
-      { name: 'chem', x: 2880, y: 220, type: 'primary' },
-      { name: 'bio', x: 450, y: 1320, type: 'primary' },
-      { name: 'phys', x: 2880, y: 1320, type: 'primary' }
-    ];
-
-    for (let i = 0; i < 18; i++) {
-      biomes.push({ name: 'math', x: rng.nextFloat(0, 1800), y: rng.nextFloat(0, 880), type: 'secondary' });
-      biomes.push({ name: 'chem', x: rng.nextFloat(1800, 3600), y: rng.nextFloat(0, 880), type: 'secondary' });
-      biomes.push({ name: 'bio', x: rng.nextFloat(0, 1800), y: rng.nextFloat(880, 1760), type: 'secondary' });
-      biomes.push({ name: 'phys', x: rng.nextFloat(1800, 3600), y: rng.nextFloat(880, 1760), type: 'secondary' });
-    }
-
+    // 2. Strict Quadrant Biome Assignment (Zero Cross-Quadrant Bleed)
     if (!tileGrid.noiseCache) tileGrid.noiseCache = new Float32Array(GRID_W * GRID_H);
     if (!tileGrid.decorations) tileGrid.decorations = new Int8Array(GRID_W * GRID_H).fill(-1);
 
     for (let ty = 2; ty < GRID_H - 2; ty++) {
       for (let tx = 2; tx < GRID_W - 2; tx++) {
-        const px = tx * TILE_SIZE + noise.noise2D(tx * 0.05, ty * 0.05) * 80;
-        const py = ty * TILE_SIZE + noise.noise2D(tx * 0.05 + 100, ty * 0.05 + 100) * 80;
-
-        let nearestBiome = null;
-        let minDist = Infinity;
-        for (const b of biomes) {
-          const dx = px - b.x;
-          const dy = py - b.y;
-          const dist = dx * dx + dy * dy;
-          if (dist < minDist) {
-            minDist = dist;
-            nearestBiome = b;
-          }
-        }
-
         const n = noise.fbm(tx * 0.12, ty * 0.12);
         tileGrid.noiseCache[tileGrid.idx(tx, ty)] = n;
 
         let type = 'grass';
-        if (nearestBiome.name === 'math') {
+
+        if (tx < 45 && ty < 22) {
+          // TOP-LEFT: Math Realm (100% Crystal Meadow & Sapphire Quartz)
           type = n > 0.72 ? 'crystal_rock' : (n > 0.48 ? 'crystal_dense' : 'grass');
-        } else if (nearestBiome.name === 'chem') {
+        } else if (tx >= 45 && ty < 22) {
+          // TOP-RIGHT: Chemistry Realm (100% Magma Lava & Exothermic Sludge)
           type = n > 0.65 ? 'lava' : (n > 0.42 ? 'volcanic' : (n > 0.22 ? 'acid_pool' : 'acid_ground'));
-        } else if (nearestBiome.name === 'bio') {
+        } else if (tx < 45 && ty >= 22) {
+          // BOTTOM-LEFT: Biology Realm (100% Bioluminescent Jungle & Swamp)
           type = n > 0.72 ? 'swamp_water' : (n > 0.48 ? 'swamp' : 'jungle');
-        } else if (nearestBiome.name === 'phys') {
+        } else {
+          // BOTTOM-RIGHT: Physics Realm (100% Metallic Circuits & Tesla Arcs)
           type = n > 0.60 ? 'lab_floor' : 'crater';
         }
         
