@@ -246,27 +246,13 @@ window.WorldGen = (() => {
             const nVal = tileGrid.noiseCache[tileGrid.idx(tx, ty)];
             let decor = -1;
             
-            const px = tx * TILE_SIZE;
-            const py = ty * TILE_SIZE;
-            let nearestBiome = null;
-            let minDist = Infinity;
-            for (const b of biomes) {
-              const dx = px - b.x;
-              const dy = py - b.y;
-              const dist = dx * dx + dy * dy;
-              if (dist < minDist) {
-                minDist = dist;
-                nearestBiome = b;
-              }
-            }
-
-            if (nearestBiome.name === 'math') {
+            if (tx < 45 && ty < 22) {
               if (r < 0.12) decor = rng.next() > 0.5 ? 0 : 1;
-            } else if (nearestBiome.name === 'chem') {
+            } else if (tx >= 45 && ty < 22) {
               if (r < 0.14) decor = rng.next() > 0.5 ? 2 : 3;
-            } else if (nearestBiome.name === 'bio') {
+            } else if (tx < 45 && ty >= 22) {
               if (r < 0.18) decor = rng.next() > 0.5 ? 4 : 5;
-            } else if (nearestBiome.name === 'phys') {
+            } else {
               if (r < 0.12) decor = rng.next() > 0.5 ? 6 : 7;
             }
 
