@@ -17,22 +17,31 @@ window.TileRenderer = (() => {
   // HD Generated Tile Image Textures
   const hdImages = {};
   const hdSources = {
+    // MATH REALM (Top-Left: Crystal Meadow & Sapphire Quartz)
     grass: 'assets/tile_grass.jpg',
     crystal_dense: 'assets/tile_crystal.jpg',
     crystal_rock: 'assets/tile_crystal.jpg',
-    acid_ground: 'assets/tile_acid.jpg',
-    acid_pool: 'assets/tile_acid.jpg',
+
+    // CHEMISTRY REALM (Top-Right: 100% Molten Magma Lava & Volcanic Basalt)
+    acid_ground: 'assets/tile_lava.jpg',
+    acid_pool: 'assets/tile_lava.jpg',
     lava: 'assets/tile_lava.jpg',
     volcanic: 'assets/tile_lava.jpg',
+
+    // BIOLOGY REALM (Bottom-Left: 100% Bioluminescent Jungle & Swamp)
     jungle: 'assets/tile_jungle.jpg',
     swamp: 'assets/tile_jungle.jpg',
     swamp_water: 'assets/tile_jungle.jpg',
+
+    // PHYSICS REALM (Bottom-Right: 100% Metallic Steel Circuits & Tesla Arcs)
     crater: 'assets/tile_physics.jpg',
     lab_floor: 'assets/tile_physics.jpg',
     wall: 'assets/tile_physics.jpg',
+    chasm: 'assets/tile_physics.jpg',
+
+    // SHARED TOWN PLAZA
     plaza: 'assets/tile_plaza.jpg',
     path: 'assets/tile_plaza.jpg',
-    chasm: 'assets/tile_physics.jpg',
     dungeon_entry: 'assets/tile_plaza.jpg'
   };
 
