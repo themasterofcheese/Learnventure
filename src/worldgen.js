@@ -88,11 +88,14 @@ window.WorldGen = (() => {
     const noise = new SeededNoise(WORLD_SEED);
     const rng = new SeededRNG(WORLD_SEED);
 
-    // 1. Fill border walls
+    // 1. Fill border walls (quadrant-aware)
     for (let ty = 0; ty < GRID_H; ty++) {
       for (let tx = 0; tx < GRID_W; tx++) {
         if (tx < 2 || tx > GRID_W - 3 || ty < 2 || ty > GRID_H - 3) {
-          tileGrid.setType(tx, ty, 'wall');
+          if (tx < 45 && ty < 22) tileGrid.setType(tx, ty, 'crystal_rock'); // Math border
+          else if (tx >= 45 && ty < 22) tileGrid.setType(tx, ty, 'volcanic'); // Chem border
+          else if (tx < 45 && ty >= 22) tileGrid.setType(tx, ty, 'swamp_water'); // Bio border
+          else tileGrid.setType(tx, ty, 'wall'); // Phys border
         }
       }
     }
@@ -137,13 +140,13 @@ window.WorldGen = (() => {
 
         let type = 'grass';
         if (nearestBiome.name === 'math') {
-          type = n > 0.72 ? 'crystal_rock' : (n > 0.5 ? 'crystal_dense' : 'grass');
+          type = n > 0.72 ? 'crystal_rock' : (n > 0.48 ? 'crystal_dense' : 'grass');
         } else if (nearestBiome.name === 'chem') {
-          type = n > 0.72 ? 'lava' : (n > 0.48 ? 'acid_pool' : 'acid_ground');
+          type = n > 0.65 ? 'lava' : (n > 0.42 ? 'volcanic' : (n > 0.22 ? 'acid_pool' : 'acid_ground'));
         } else if (nearestBiome.name === 'bio') {
-          type = n > 0.72 ? 'swamp_water' : (n > 0.5 ? 'swamp' : 'jungle');
+          type = n > 0.72 ? 'swamp_water' : (n > 0.48 ? 'swamp' : 'jungle');
         } else if (nearestBiome.name === 'phys') {
-          type = n > 0.72 ? 'volcanic' : (n > 0.48 ? 'lab_floor' : 'crater');
+          type = n > 0.60 ? 'lab_floor' : 'crater';
         }
         
         tileGrid.setType(tx, ty, type);
