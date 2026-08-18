@@ -544,6 +544,11 @@ const App = (() => {
   let activeDungeonId = null;
   let surfaceReturnCoords = { x: 1800, y: 880 };
 
+  // Isaac-style dungeon run state
+  let dungeonRun      = null;  // DungeonRun instance
+  let currentRoomIdx  = 0;     // which room player is in
+  let roomLocked      = false; // combat doors locked
+
   const dungeonPortals = [
     // 4 Built-in 3D Mineshaft Dungeon Entrances across the 3600x1760 4x Open World Map
     { id: 'dungeon_math', x: 650, y: 350, realm: 'math', name: '⛏️ Ancient Math Catacombs Mineshaft', color: '#3b82f6' },
@@ -701,44 +706,43 @@ const App = (() => {
     };
   };
 
-  const initDungeonMinions = (dungeonId = 'dungeon_math') => {
-    initDungeonChests(dungeonId);
-    // Dungeon Exclusive Monsters (NO surface minions inside dungeons!)
-    if (dungeonId === 'dungeon_chem') {
-      minions = [
-        { id: 'dung_chem_1', subject: 'chem', name: 'Nether Hydra', sprite: 'assets/minion_dungeon_hydra.jpg', x: 350, y: 220, vx: 1.4, vy: 1.1, radius: 18, emoji: '🐍', active: true },
-        { id: 'dung_chem_2', subject: 'math', name: 'Obsidian Golem', sprite: 'assets/minion_dungeon_golem.jpg', x: 750, y: 320, vx: -1.2, vy: 1.3, radius: 18, emoji: '🗿', active: true },
-        { id: 'dung_chem_3', subject: 'chem', name: 'Nether Hydra', sprite: 'assets/minion_dungeon_hydra.jpg', x: 1300, y: 220, vx: 1.1, vy: -1.4, radius: 18, emoji: '🐍', active: true },
-        { id: 'dung_chem_4', subject: 'phys', name: 'Obsidian Golem', sprite: 'assets/minion_dungeon_golem.jpg', x: 1550, y: 650, vx: -1.3, vy: -1.1, radius: 18, emoji: '🗿', active: true }
-      ];
-    } else if (dungeonId === 'dungeon_bio') {
-      minions = [
-        { id: 'dung_bio_1', subject: 'bio', name: 'Nether Hydra', sprite: 'assets/minion_dungeon_hydra.jpg', x: 350, y: 250, vx: 1.2, vy: 1.3, radius: 18, emoji: '🐍', active: true },
-        { id: 'dung_bio_2', subject: 'math', name: 'Obsidian Golem', sprite: 'assets/minion_dungeon_golem.jpg', x: 650, y: 600, vx: -1.4, vy: -1.1, radius: 18, emoji: '🗿', active: true },
-        { id: 'dung_bio_3', subject: 'bio', name: 'Nether Hydra', sprite: 'assets/minion_dungeon_hydra.jpg', x: 1250, y: 700, vx: 1.1, vy: 1.4, radius: 18, emoji: '🐍', active: true },
-        { id: 'dung_bio_4', subject: 'phys', name: 'Obsidian Golem', sprite: 'assets/minion_dungeon_golem.jpg', x: 1450, y: 250, vx: -1.3, vy: -1.2, radius: 18, emoji: '🗿', active: true }
-      ];
-    } else if (dungeonId === 'dungeon_phys') {
-      minions = [
-        { id: 'dung_phys_1', subject: 'phys', name: 'Obsidian Golem', sprite: 'assets/minion_dungeon_golem.jpg', x: 400, y: 200, vx: 1.3, vy: -1.2, radius: 18, emoji: '🗿', active: true },
-        { id: 'dung_phys_2', subject: 'bio', name: 'Nether Hydra', sprite: 'assets/minion_dungeon_hydra.jpg', x: 800, y: 650, vx: -1.1, vy: 1.4, radius: 18, emoji: '🐍', active: true },
-        { id: 'dung_phys_3', subject: 'phys', name: 'Obsidian Golem', sprite: 'assets/minion_dungeon_golem.jpg', x: 1200, y: 250, vx: 1.4, vy: 1.1, radius: 18, emoji: '🗿', active: true },
-        { id: 'dung_phys_4', subject: 'chem', name: 'Nether Hydra', sprite: 'assets/minion_dungeon_hydra.jpg', x: 1600, y: 600, vx: -1.2, vy: -1.3, radius: 18, emoji: '🐍', active: true }
-      ];
-    } else {
-      // Math Catacombs Dungeon
-      minions = [
-        { id: 'dung_math_1', subject: 'math', name: 'Obsidian Golem', sprite: 'assets/minion_dungeon_golem.jpg', x: 300, y: 200, vx: 1.4, vy: 1.1, radius: 18, emoji: '🗿', active: true },
-        { id: 'dung_math_2', subject: 'chem', name: 'Nether Hydra', sprite: 'assets/minion_dungeon_hydra.jpg', x: 700, y: 300, vx: -1.2, vy: 1.3, radius: 18, emoji: '🐍', active: true },
-        { id: 'dung_math_3', subject: 'math', name: 'Obsidian Golem', sprite: 'assets/minion_dungeon_golem.jpg', x: 1300, y: 200, vx: 1.1, vy: -1.4, radius: 18, emoji: '🗿', active: true },
-        { id: 'dung_math_4', subject: 'bio', name: 'Nether Hydra', sprite: 'assets/minion_dungeon_hydra.jpg', x: 1500, y: 650, vx: -1.3, vy: -1.1, radius: 18, emoji: '🐍', active: true }
-      ];
+  // Show a rich modal when the player earns a Synergy Dungeon Item
+  const showSynergyItemModal = (item) => {
+    const modal = document.getElementById('chest-loot-modal');
+    if (!modal) return;
+    const detailsEl = document.getElementById('chest-loot-details');
+    if (detailsEl) {
+      detailsEl.innerHTML = `
+        <div style="text-align:center; margin-bottom:10px;">
+          <div style="font-size:3rem; line-height:1;">${item.icon}</div>
+          <strong style="color:#a78bfa; font-size:1.2rem; display:block; margin-top:8px;">SYNERGY RELIC ACQUIRED!</strong>
+          <div style="color:#e2e8f0; font-size:1.05rem; margin-top:4px;">${item.name}</div>
+          <div style="color:#94a3b8; font-size:0.85rem; margin-top:6px;">${item.desc}</div>
+          <div style="margin-top:12px; padding:8px 14px; background:rgba(167,139,250,0.12); border:1px solid rgba(167,139,250,0.35); border-radius:8px; font-size:0.8rem; color:#c4b5fd;">
+            ✨ This relic is now permanently active for all your future battles!
+          </div>
+        </div>
+      `;
     }
+    // Temporarily change header colour
+    const headerEl = modal.querySelector('h2, .modal-title');
+    if (headerEl) headerEl.style.color = '#a78bfa';
+    modal.classList.remove('hidden');
+    document.getElementById('close-chest-loot-btn').onclick = () => {
+      if (window.AudioEngine) window.AudioEngine.playClick();
+      modal.classList.add('hidden');
+    };
+  };
 
-    // 5% Chance for each dungeon monster to spawn as Special ⭐
-    minions.forEach(m => {
-      m.isSpecial = Math.random() < 0.05;
-    });
+  const initDungeonMinions = (dungeonId = 'dungeon_math') => {
+    // Isaac dungeon: load enemies from the current room instead of fixed arrays
+    if (dungeonRun && window.DungeonEngine) {
+      const room = dungeonRun.rooms[currentRoomIdx];
+      minions = (room && room.enemies && room.enemies.length > 0) ? room.enemies : [];
+      return;
+    }
+    // Fallback: no enemies until a room is entered
+    minions = [];
   };
 
   const initAdventureMinions = () => {
@@ -1521,10 +1525,22 @@ const App = (() => {
         if (dist < 32) {
           inDungeon = true;
           activeDungeonId = dp.id;
-          surfaceReturnCoords = { x: dp.x, y: dp.y + 45 }; // Record position right outside this entrance!
+          surfaceReturnCoords = { x: dp.x, y: dp.y + 45 };
+
+          // Generate Isaac-style room network (daily seed so layout varies each day)
+          if (window.DungeonEngine) {
+            const dayOffset = ['dungeon_math','dungeon_chem','dungeon_bio','dungeon_phys'].indexOf(dp.id);
+            const daySeed   = (Math.floor(Date.now() / 86400000) * 1000) + dayOffset + 7;
+            dungeonRun     = window.DungeonEngine.generateDungeonRun(dp.id, daySeed);
+            currentRoomIdx = dungeonRun.startRoomIdx;
+            roomLocked     = false;
+            dungeonRun.rooms[currentRoomIdx].visited = true;
+          }
+
+          // Spawn player at centre-bottom of start room (away from north doors)
           playerX = 900;
-          playerY = 650;
-          initDungeonMinions(dp.id);
+          playerY = 620;
+          initDungeonMinions(dp.id); // start room — no enemies
           if (window.AudioEngine) window.AudioEngine.playSparkle();
         }
       });
@@ -1618,207 +1634,215 @@ const App = (() => {
       ctx.fillText('⚡ Aether Core', 1800, 884);
 
     } else {
-      // ----------------------------------------------------
-      // SUBTERRANEAN STONE DUNGEON WORLD (1800x880)
-      // ----------------------------------------------------
-      // Render HD Subterranean Stone Catacombs Floor (assets/dungeon_bg.jpg)
-      if (dungeonBgImg && (dungeonBgImg.complete || dungeonBgImg.src) && dungeonBgImg.naturalWidth !== 0) {
-        ctx.drawImage(dungeonBgImg, 0, 0, 1800, 880);
-        ctx.fillStyle = 'rgba(2, 6, 23, 0.35)'; // Ambient subterranean vignette overlay
-        ctx.fillRect(0, 0, 1800, 880);
-      } else {
-        ctx.fillStyle = '#0f172a';
-        ctx.fillRect(0, 0, 1800, 880);
-      }
+      // ──────────────────────────────────────────────────────
+      // ISAAC-STYLE ROOM NETWORK DUNGEON
+      // ──────────────────────────────────────────────────────
+      if (dungeonRun && window.DungeonEngine) {
+        const DE  = window.DungeonEngine;
+        const curRoom = dungeonRun.rooms[currentRoomIdx];
 
-      // Dungeon Stone Architecture Grid Overlay
-      ctx.strokeStyle = 'rgba(234, 88, 12, 0.08)';
-      ctx.lineWidth = 1;
-      for (let i = 0; i < 1800; i += 60) {
-        ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 880); ctx.stroke();
-      }
-      for (let j = 0; j < 880; j += 60) {
-        ctx.beginPath(); ctx.moveTo(0, j); ctx.lineTo(1800, j); ctx.stroke();
-      }
+        // Check if current combat/boss/question room just got cleared
+        const _checkClear = (rm) => {
+          if (rm.cleared) return;
+          if (!['combat','boss','question'].includes(rm.type)) return;
+          const allDead = rm.enemies.length > 0 && rm.enemies.every(e => !e.active);
+          if (allDead) {
+            rm.cleared = true;
+            roomLocked = false;
+            minions    = [];
+            if (rm.type === 'combat') dungeonRun.checkAllCombatCleared();
+            if (window.AudioEngine) window.AudioEngine.playSparkle();
+          }
+        };
+        _checkClear(curRoom);
 
-      // Torch Sconces Ambient Light Effects
-      const torches = [
-        { x: 300, y: 150 }, { x: 900, y: 150 }, { x: 1500, y: 150 },
-        { x: 300, y: 750 }, { x: 900, y: 750 }, { x: 1500, y: 750 }
-      ];
-      torches.forEach(t => {
-        const tFlicker = Math.sin(Date.now() / 80 + t.x) * 4;
-        const tGrad = ctx.createRadialGradient(t.x, t.y, 2, t.x, t.y, 65 + tFlicker);
-        tGrad.addColorStop(0, 'rgba(251, 146, 60, 0.6)');
-        tGrad.addColorStop(0.5, 'rgba(234, 88, 12, 0.25)');
-        tGrad.addColorStop(1, 'transparent');
-        ctx.fillStyle = tGrad;
-        ctx.beginPath(); ctx.arc(t.x, t.y, 65 + tFlicker, 0, Math.PI * 2); ctx.fill();
+        // Door Transition Detection
+        const T  = DE.WALL_T, DW = DE.DOOR_W;
+        const RW = DE.ROOM_W, RH = DE.ROOM_H;
+        const TRANS = [
+          { dir:'north', hitFn: () => playerY < T + 22,  inRange: () => playerX > RW/2-DW/2 && playerX < RW/2+DW/2, spawnX: RW/2,    spawnY: RH-T-70 },
+          { dir:'south', hitFn: () => playerY > RH-T-22, inRange: () => playerX > RW/2-DW/2 && playerX < RW/2+DW/2, spawnX: RW/2,    spawnY: T+70    },
+          { dir:'west',  hitFn: () => playerX < T + 22,  inRange: () => playerY > RH/2-DW/2 && playerY < RH/2+DW/2, spawnX: RW-T-90, spawnY: RH/2    },
+          { dir:'east',  hitFn: () => playerX > RW-T-22, inRange: () => playerY > RH/2-DW/2 && playerY < RH/2+DW/2, spawnX: T+90,    spawnY: RH/2    }
+        ];
 
-        // Torch Wall Sconce Icon
-        ctx.fillStyle = '#fb923c';
-        ctx.beginPath(); ctx.arc(t.x, t.y, 4, 0, Math.PI * 2); ctx.fill();
-      });
-
-      // Distinct Dungeon Title Banner
-      const dungeonNames = {
-        dungeon_math: '⛏️ SUBTERRANEAN MATH CATACOMBS MINESHAFT',
-        dungeon_chem: '⛏️ VOLCANIC CHEMICAL MINESHAFT DUNGEON',
-        dungeon_bio: '⛏️ BIOLUMINESCENT ABYSS MINESHAFT',
-        dungeon_phys: '⛏️ QUANTUM SPACETIME MINESHAFT VAULT'
-      };
-      const curDungeonTitle = dungeonNames[activeDungeonId] || '⛏️ SUBTERRANEAN STONE MINESHAFT';
-
-      ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
-      ctx.fillRect(680, 20, 440, 32);
-      ctx.strokeStyle = '#ea580c';
-      ctx.lineWidth = 1.5;
-      ctx.strokeRect(680, 20, 440, 32);
-      ctx.font = 'bold 11px Outfit';
-      ctx.fillStyle = '#fdba74';
-      ctx.textAlign = 'center';
-      ctx.fillText(curDungeonTitle, 900, 40);
-
-      // Mineshaft Exit Surface Portal at (900, 440)
-      const exPulse = Math.sin(Date.now() / 150) * 4;
-      const exGrad = ctx.createRadialGradient(900, 440, 5, 900, 440, 32 + exPulse);
-      exGrad.addColorStop(0, '#ffffff');
-      exGrad.addColorStop(0.5, '#38bdf8');
-      exGrad.addColorStop(1, 'transparent');
-      ctx.fillStyle = exGrad;
-      ctx.beginPath(); ctx.arc(900, 440, 32 + exPulse, 0, Math.PI * 2); ctx.fill();
-
-      // Mineshaft Sprite Graphic for Exit
-      if (mineshaftSprite && mineshaftSprite.complete && mineshaftSprite.naturalWidth !== 0) {
-        ctx.save();
-        ctx.beginPath(); ctx.arc(900, 440, 22, 0, Math.PI * 2); ctx.clip();
-        ctx.drawImage(mineshaftSprite, 878, 418, 44, 44);
-        ctx.restore();
-      } else {
-        ctx.font = '22px Outfit'; ctx.textAlign = 'center'; ctx.fillText('⛏️', 900, 447);
-      }
-
-      ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 2.5;
-      ctx.beginPath(); ctx.arc(900, 440, 22, 0, Math.PI * 2); ctx.stroke();
-
-      ctx.font = 'bold 10px Outfit'; ctx.fillStyle = '#38bdf8'; ctx.fillText('⬆️ EXIT MINESHAFT TO SURFACE', 900, 396);
-
-      // Check Exit Portal Collision (returns RIGHT OUTSIDE the entrance used!)
-      const exDist = Math.hypot(playerX - 900, playerY - 440);
-      if (exDist < 30) {
-        inDungeon = false;
-        playerX = surfaceReturnCoords.x;
-        playerY = surfaceReturnCoords.y; // Teleports RIGHT OUTSIDE the exact entrance!
-        activeDungeonId = null;
-        initAdventureMinions();
-        if (window.AudioEngine) window.AudioEngine.playSparkle();
-      }
-
-      // Render & Process Subterranean Treasure Chests
-      activeDungeonChests.forEach(chest => {
-        const dist = Math.hypot(playerX - chest.x, playerY - chest.y);
-        ctx.save();
-        ctx.translate(chest.x, chest.y);
-
-        // Ground Drop Shadow
-        ctx.fillStyle = 'rgba(2, 6, 23, 0.6)';
-        ctx.beginPath();
-        ctx.ellipse(0, 14, 18, 8, 0, 0, Math.PI * 2);
-        ctx.fill();
-
-        if (!chest.opened) {
-          // Unopened Glowing Gold Treasure Chest
-          const pulse = Math.sin(Date.now() / 180 + chest.x) * 3;
-          const cGlow = ctx.createRadialGradient(0, 0, 4, 0, 0, 26 + pulse);
-          cGlow.addColorStop(0, 'rgba(251, 191, 36, 0.55)');
-          cGlow.addColorStop(1, 'transparent');
-          ctx.fillStyle = cGlow;
-          ctx.beginPath(); ctx.arc(0, 0, 26 + pulse, 0, Math.PI * 2); ctx.fill();
-
-          // Render Higgsfield 3D Closed Treasure Chest Sprite!
-          const cImg = chestSprites.closed;
-          if (cImg && (cImg.complete || cImg.src)) {
-            const tImg = getTransparentSprite(cImg);
-            if (tImg) {
-              ctx.save();
-              ctx.beginPath();
-              ctx.arc(0, -2, 20, 0, Math.PI * 2);
-              ctx.clip();
-              ctx.drawImage(tImg, -20, -22, 40, 40);
-              ctx.restore();
+        for (const t of TRANS) {
+          const nbIdx = curRoom.doors[t.dir];
+          if (nbIdx === null || nbIdx === undefined) continue;
+          if (roomLocked) continue;
+          const nb = dungeonRun.rooms[nbIdx];
+          if (nb.type === 'boss' && !dungeonRun.allCombatCleared) continue;
+          if (t.hitFn() && t.inRange()) {
+            currentRoomIdx = nbIdx;
+            playerX = t.spawnX;
+            playerY = t.spawnY;
+            if (!nb.visited) {
+              nb.visited = true;
+              if (nb.type === 'curse') {
+                player.hp = Math.max(1, (player.hp || 100) - 20);
+                updateHUD();
+              }
+              if (nb.type === 'combat') {
+                nb.enemies = DE.spawnRoomEnemies(nb, activeDungeonId, false);
+                minions = nb.enemies; roomLocked = true;
+              }
+              if (nb.type === 'boss') {
+                nb.enemies = DE.spawnRoomEnemies(nb, activeDungeonId, true);
+                minions = nb.enemies; roomLocked = true;
+              }
+              if (nb.type === 'question') {
+                nb.enemies = DE.spawnQuizSpirit(activeDungeonId);
+                minions = nb.enemies; roomLocked = true;
+              }
             } else {
-              ctx.font = '26px Outfit'; ctx.textAlign = 'center'; ctx.fillText('🎁', 0, 6);
+              if (['combat','boss','question'].includes(nb.type) && !nb.cleared) {
+                minions = nb.enemies; roomLocked = true;
+              } else {
+                minions = []; roomLocked = false;
+              }
             }
-          } else {
-            ctx.font = '26px Outfit'; ctx.textAlign = 'center'; ctx.fillText('🎁', 0, 6);
-          }
-
-          // Nearby Tooltip
-          if (dist < 45) {
-            ctx.fillStyle = '#fbbf24';
-            ctx.font = 'bold 10px Outfit';
-            ctx.fillText('✨ Touch to Open Chest (2-20 Coins + Items)', 0, -22);
-          }
-
-          // Open Collision
-          if (dist < 28) {
-            chest.opened = true;
-
-            // Save opened chests state
-            try {
-              let savedState = {};
-              const saved = localStorage.getItem('knowledge_quest_chests');
-              if (saved) savedState = JSON.parse(saved);
-              savedState[chest.id] = true;
-              localStorage.setItem('knowledge_quest_chests', JSON.stringify(savedState));
-            } catch (e) {}
-
-            // Reward: 2-20 Gold Coins
-            const goldCoins = Math.floor(Math.random() * 19) + 2;
-            player.gold += goldCoins;
-
-            // 35% Chance to Drop an Item
-            const itemPool = ['potion_hp', 'potion_mp', 'wand_apprentice', 'staff_archmage', 'robe_aether', 'ring_quantum'];
-            let bonusItem = null;
-            if (Math.random() < 0.35) {
-              bonusItem = itemPool[Math.floor(Math.random() * itemPool.length)];
-              player.inventory.push(bonusItem);
-            }
-
-            if (window.AudioEngine) {
-              window.AudioEngine.playSparkle();
-              window.AudioEngine.playCoin();
-            }
-
-            saveState();
-            updateHUD();
-            if (window.DashboardEngine) window.DashboardEngine.updateDashboardUI();
-            showChestLootModal(goldCoins, bonusItem);
-          }
-        } else {
-          // Render Higgsfield 3D Opened Treasure Chest Sprite!
-          const oImg = chestSprites.open;
-          if (oImg && (oImg.complete || oImg.src)) {
-            const tImg = getTransparentSprite(oImg);
-            if (tImg) {
-              ctx.save();
-              ctx.globalAlpha = 0.65;
-              ctx.beginPath();
-              ctx.arc(0, -2, 18, 0, Math.PI * 2);
-              ctx.clip();
-              ctx.drawImage(tImg, -18, -20, 36, 36);
-              ctx.restore();
-            } else {
-              ctx.font = '22px Outfit'; ctx.textAlign = 'center'; ctx.globalAlpha = 0.55; ctx.fillText('📭', 0, 6);
-            }
-          } else {
-            ctx.font = '22px Outfit'; ctx.textAlign = 'center'; ctx.globalAlpha = 0.55; ctx.fillText('📭', 0, 6);
+            break;
           }
         }
 
-        ctx.restore();
-      });
+        // Render room
+        DE.renderRoom(ctx, dungeonRun, currentRoomIdx, playerX, playerY, roomLocked, dungeonBgImg, chestSprites);
+
+        // Minimap
+        DE.renderMinimap(ctx, dungeonRun, currentRoomIdx, canvas.width || 1800);
+
+        // Exit Portal (start room only)
+        if (currentRoomIdx === dungeonRun.startRoomIdx) {
+          const exitX = RW / 2, exitY = RH - 210;
+          const exPulse = Math.sin(Date.now() / 150) * 4;
+          const exGrad  = ctx.createRadialGradient(exitX, exitY, 5, exitX, exitY, 32 + exPulse);
+          exGrad.addColorStop(0, '#ffffff');
+          exGrad.addColorStop(0.5, '#38bdf8');
+          exGrad.addColorStop(1, 'transparent');
+          ctx.fillStyle = exGrad;
+          ctx.beginPath(); ctx.arc(exitX, exitY, 32 + exPulse, 0, Math.PI * 2); ctx.fill();
+          if (mineshaftSprite && mineshaftSprite.complete && mineshaftSprite.naturalWidth !== 0) {
+            ctx.save(); ctx.beginPath(); ctx.arc(exitX, exitY, 22, 0, Math.PI * 2); ctx.clip();
+            ctx.drawImage(mineshaftSprite, exitX - 22, exitY - 22, 44, 44); ctx.restore();
+          } else {
+            ctx.font = '22px Outfit'; ctx.textAlign = 'center'; ctx.fillText('\u26cf\ufe0f', exitX, exitY + 7);
+          }
+          ctx.strokeStyle = '#38bdf8'; ctx.lineWidth = 2.5;
+          ctx.beginPath(); ctx.arc(exitX, exitY, 22, 0, Math.PI * 2); ctx.stroke();
+          ctx.font = 'bold 10px Outfit'; ctx.fillStyle = '#38bdf8'; ctx.textAlign = 'center';
+          ctx.fillText('\u2b06\ufe0f EXIT DUNGEON TO SURFACE', exitX, exitY - 40);
+          const exDist = Math.hypot(playerX - exitX, playerY - exitY);
+          if (exDist < 34) {
+            inDungeon = false; dungeonRun = null; currentRoomIdx = 0; roomLocked = false;
+            playerX = surfaceReturnCoords.x; playerY = surfaceReturnCoords.y;
+            activeDungeonId = null;
+            initAdventureMinions();
+            if (window.AudioEngine) window.AudioEngine.playSparkle();
+          }
+        }
+
+        // Chest rendering for current room
+        const roomForChest = dungeonRun.rooms[currentRoomIdx];
+        if (roomForChest && roomForChest.chest) {
+          const chest = roomForChest.chest;
+          const cDist = Math.hypot(playerX - chest.x, playerY - chest.y);
+          ctx.save(); ctx.translate(chest.x, chest.y);
+          ctx.fillStyle = 'rgba(2,6,23,0.6)';
+          ctx.beginPath(); ctx.ellipse(0, 14, 18, 8, 0, 0, Math.PI * 2); ctx.fill();
+          if (!chest.opened) {
+            const pulse = Math.sin(Date.now() / 180 + chest.x) * 3;
+            const cGlow = ctx.createRadialGradient(0, 0, 4, 0, 0, 30 + pulse);
+            if (chest.isFinal) {
+              cGlow.addColorStop(0, 'rgba(167,139,250,0.75)'); cGlow.addColorStop(1, 'transparent');
+            } else {
+              cGlow.addColorStop(0, 'rgba(251,191,36,0.55)'); cGlow.addColorStop(1, 'transparent');
+            }
+            ctx.fillStyle = cGlow; ctx.beginPath(); ctx.arc(0, 0, 30 + pulse, 0, Math.PI * 2); ctx.fill();
+            const cImg = chestSprites.closed;
+            if (cImg && (cImg.complete || cImg.src)) {
+              const tImg = getTransparentSprite(cImg);
+              if (tImg) {
+                ctx.save(); ctx.beginPath(); ctx.arc(0, -2, 20, 0, Math.PI * 2); ctx.clip();
+                ctx.drawImage(tImg, -20, -22, 40, 40); ctx.restore();
+              } else {
+                ctx.font = chest.isFinal ? '30px Outfit' : '26px Outfit';
+                ctx.textAlign = 'center'; ctx.fillText(chest.isFinal ? '\u2728' : '\ud83c\udf81', 0, 6);
+              }
+            } else {
+              ctx.font = chest.isFinal ? '30px Outfit' : '26px Outfit';
+              ctx.textAlign = 'center'; ctx.fillText(chest.isFinal ? '\u2728' : '\ud83c\udf81', 0, 6);
+            }
+            if (cDist < 60) {
+              ctx.fillStyle = chest.isFinal ? '#a78bfa' : '#fbbf24';
+              ctx.font = 'bold 11px Outfit'; ctx.textAlign = 'center';
+              ctx.fillText(chest.isFinal ? '\u2728 RELIC CHEST \u2014 Touch to claim!' : '\u2728 Touch to Open Chest', 0, -36);
+            }
+            if (cDist < 36) {
+              chest.opened = true;
+              if (window.AudioEngine) { window.AudioEngine.playSparkle(); window.AudioEngine.playCoin(); }
+              if (chest.isFinal) {
+                if (!player.dungeonItems) player.dungeonItems = [];
+                const pool    = DE.SYNERGY_ITEMS;
+                const unowned = pool.filter(si => !player.dungeonItems.find(di => di.id === si.id));
+                const src     = unowned.length ? unowned : pool;
+                const awarded = src[Math.floor(Math.random() * src.length)];
+                player.dungeonItems.push(awarded);
+                saveState(); updateHUD();
+                showSynergyItemModal(awarded);
+              } else {
+                const goldCoins = Math.floor(Math.random() * 24) + 6;
+                player.gold += goldCoins;
+                const itemPool = ['potion_hp','potion_mp','wand_apprentice','staff_archmage','robe_aether','ring_quantum'];
+                let bonusItem = null;
+                if (Math.random() < 0.40) {
+                  bonusItem = itemPool[Math.floor(Math.random() * itemPool.length)];
+                  player.inventory.push(bonusItem);
+                }
+                saveState(); updateHUD();
+                if (window.DashboardEngine) window.DashboardEngine.updateDashboardUI();
+                showChestLootModal(goldCoins, bonusItem);
+              }
+            }
+          } else {
+            const oImg = chestSprites.open;
+            if (oImg && (oImg.complete || oImg.src)) {
+              const tImg = getTransparentSprite(oImg);
+              if (tImg) {
+                ctx.save(); ctx.globalAlpha = 0.65;
+                ctx.beginPath(); ctx.arc(0, -2, 18, 0, Math.PI * 2); ctx.clip();
+                ctx.drawImage(tImg, -18, -20, 36, 36); ctx.restore();
+              } else {
+                ctx.font = '22px Outfit'; ctx.textAlign = 'center'; ctx.globalAlpha = 0.55; ctx.fillText('\ud83d\udced', 0, 6);
+              }
+            } else {
+              ctx.font = '22px Outfit'; ctx.textAlign = 'center'; ctx.globalAlpha = 0.55; ctx.fillText('\ud83d\udced', 0, 6);
+            }
+          }
+          ctx.restore();
+        }
+
+        // Synergy Items HUD (bottom-left)
+        if (player.dungeonItems && player.dungeonItems.length > 0) {
+          const hx = 12, hy = (canvas.height || 600) - 62;
+          const hw = player.dungeonItems.length * 38 + 76;
+          ctx.fillStyle   = 'rgba(2,6,23,0.88)';
+          ctx.strokeStyle = 'rgba(167,139,250,0.45)';
+          ctx.lineWidth   = 1.2;
+          ctx.beginPath(); ctx.roundRect(hx, hy, hw, 46, 8); ctx.fill(); ctx.stroke();
+          ctx.font = 'bold 8px Outfit'; ctx.fillStyle = '#c4b5fd'; ctx.textAlign = 'left';
+          ctx.fillText('RELICS:', hx + 8, hy + 13);
+          player.dungeonItems.forEach((item, i) => {
+            ctx.font = '18px Outfit'; ctx.textAlign = 'center';
+            ctx.fillText(item.icon, hx + 68 + i * 36, hy + 30);
+          });
+        }
+
+      } else {
+        // DungeonEngine not ready
+        ctx.fillStyle = '#0f172a'; ctx.fillRect(0, 0, 1800, 880);
+        ctx.fillStyle = '#64748b'; ctx.font = 'bold 18px Outfit'; ctx.textAlign = 'center';
+        ctx.fillText('Loading dungeon...', 900, 440);
+      }
     }
 
     // Draw particle sparkles
