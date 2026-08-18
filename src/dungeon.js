@@ -48,6 +48,49 @@ window.DungeonEngine = (() => {
     { id: 'barrier_ward',     name: 'Barrier Ward',    icon: '🛡️', desc: 'Each new battle starts with 2 damage-absorbing shield layers.' }
   ];
 
+  // ─── HD Dungeon Tile Textures ──────────────────────────────
+  const dungeonTextures = {};
+  const dungeonTextureSources = {
+    dungeon_math_floor: 'assets/dungeon_math_floor.jpg',
+    dungeon_math_wall:  'assets/dungeon_math_wall.jpg',
+    dungeon_chem_floor: 'assets/dungeon_chem_floor.jpg',
+    dungeon_chem_wall:  'assets/dungeon_chem_wall.jpg',
+    dungeon_bio_floor:  'assets/dungeon_bio_floor.jpg',
+    dungeon_bio_wall:   'assets/dungeon_bio_wall.jpg',
+    dungeon_phys_floor: 'assets/dungeon_phys_floor.jpg',
+    dungeon_phys_wall:  'assets/dungeon_phys_wall.jpg'
+  };
+
+  const patternCache = new Map();
+
+  function getDungeonTexturePattern(ctx, key) {
+    if (patternCache.has(key)) return patternCache.get(key);
+    const src = dungeonTextureSources[key];
+    if (!src) return null;
+    if (!dungeonTextures[key]) {
+      const img = new Image();
+      img.src = src;
+      img.onload = () => { patternCache.delete(key); };
+      dungeonTextures[key] = img;
+    }
+    const img = dungeonTextures[key];
+    if (img && img.complete && img.naturalWidth !== 0) {
+      try {
+        const pattern = ctx.createPattern(img, 'repeat');
+        patternCache.set(key, pattern);
+        return pattern;
+      } catch(e) {}
+    }
+    return null;
+  }
+
+  // Pre-trigger image downloads
+  for (const k in dungeonTextureSources) {
+    const img = new Image();
+    img.src = dungeonTextureSources[k];
+    dungeonTextures[k] = img;
+  }
+
   // ─── Subject Themes ──────────────────────────────────────────
   const THEMES = {
     dungeon_math:  { wall: '#1a2f52', torch: '#38bdf8', torchRgb: '56,189,248', accent: '#7dd3fc', label: '⛏️ MATH CATACOMBS'    },
@@ -213,7 +256,14 @@ window.DungeonEngine = (() => {
     const cx = W / 2, cy = H / 2;
 
     // ── Floor background ──
-    if (dungeonBgImg && dungeonBgImg.complete && dungeonBgImg.naturalWidth !== 0) {
+    const floorKey = `${run.subject}_floor`;
+    const wallKey  = `${run.subject}_wall`;
+
+    const floorPattern = getDungeonTexturePattern(ctx, floorKey);
+    if (floorPattern) {
+      ctx.fillStyle = floorPattern;
+      ctx.fillRect(0, 0, W, H);
+    } else if (dungeonBgImg && dungeonBgImg.complete && dungeonBgImg.naturalWidth !== 0) {
       ctx.drawImage(dungeonBgImg, 0, 0, W, H);
     } else {
       ctx.fillStyle = '#0f172a';
@@ -241,7 +291,12 @@ window.DungeonEngine = (() => {
     for (let y = T; y < H - T; y += 64) { ctx.beginPath(); ctx.moveTo(T, y); ctx.lineTo(W - T, y); ctx.stroke(); }
 
     // ── Walls ──
-    ctx.fillStyle = th.wall;
+    const wallPattern = getDungeonTexturePattern(ctx, wallKey);
+    if (wallPattern) {
+      ctx.fillStyle = wallPattern;
+    } else {
+      ctx.fillStyle = th.wall;
+    }
     ctx.fillRect(0, 0, W, T);          // top
     ctx.fillRect(0, H - T, W, T);      // bottom
     ctx.fillRect(0, 0, T, H);          // left
