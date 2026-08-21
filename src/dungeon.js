@@ -78,7 +78,14 @@ window.DungeonEngine = (() => {
     const img = dungeonTextures[key];
     if (img && img.complete && img.naturalWidth !== 0) {
       try {
-        const pattern = ctx.createPattern(img, 'repeat');
+        const offCanvas = document.createElement('canvas');
+        const tilePx = 64; // Scale 1024px HD texture down to crisp 64px RPG tiles
+        offCanvas.width = tilePx;
+        offCanvas.height = tilePx;
+        const offCtx = offCanvas.getContext('2d');
+        offCtx.drawImage(img, 0, 0, tilePx, tilePx);
+
+        const pattern = ctx.createPattern(offCanvas, 'repeat');
         patternCache.set(key, pattern);
         return pattern;
       } catch(e) {}
@@ -257,19 +264,23 @@ window.DungeonEngine = (() => {
     const W = ROOM_W, H = ROOM_H, T = WALL_T, DW = DOOR_W;
     const cx = W / 2, cy = H / 2;
 
-    // ── Floor background ──
+    // ── Fill outer void viewport ──
+    ctx.fillStyle = '#020617';
+    ctx.fillRect(-OFFSET_X, -OFFSET_Y, 1800, 880);
+
+    // ── Floor interior background (T, T, W - 2*T, H - 2*T) ──
     const floorKey = `${run.subject}_floor`;
     const wallKey  = `${run.subject}_wall`;
 
     const floorPattern = getDungeonTexturePattern(ctx, floorKey);
     if (floorPattern) {
       ctx.fillStyle = floorPattern;
-      ctx.fillRect(0, 0, W, H);
+      ctx.fillRect(T, T, W - 2 * T, H - 2 * T);
     } else if (dungeonBgImg && dungeonBgImg.complete && dungeonBgImg.naturalWidth !== 0) {
-      ctx.drawImage(dungeonBgImg, 0, 0, W, H);
+      ctx.drawImage(dungeonBgImg, T, T, W - 2 * T, H - 2 * T);
     } else {
       ctx.fillStyle = '#0f172a';
-      ctx.fillRect(0, 0, W, H);
+      ctx.fillRect(T, T, W - 2 * T, H - 2 * T);
     }
 
     // Room-type atmosphere overlay
@@ -284,7 +295,7 @@ window.DungeonEngine = (() => {
       boss:     'rgba(22,0,0,0.58)'
     };
     ctx.fillStyle = overlays[room.type] || 'rgba(2,6,23,0.35)';
-    ctx.fillRect(0, 0, W, H);
+    ctx.fillRect(T, T, W - 2 * T, H - 2 * T);
 
     // Subtle stone grid
     ctx.strokeStyle = 'rgba(255,255,255,0.035)';
@@ -292,17 +303,27 @@ window.DungeonEngine = (() => {
     for (let x = T; x < W - T; x += 64) { ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, H - T); ctx.stroke(); }
     for (let y = T; y < H - T; y += 64) { ctx.beginPath(); ctx.moveTo(T, y); ctx.lineTo(W - T, y); ctx.stroke(); }
 
-    // ── Walls ──
+    // ── Perimeter Walls ──
     const wallPattern = getDungeonTexturePattern(ctx, wallKey);
     if (wallPattern) {
       ctx.fillStyle = wallPattern;
     } else {
       ctx.fillStyle = th.wall;
     }
-    ctx.fillRect(0, 0, W, T);          // top
-    ctx.fillRect(0, H - T, W, T);      // bottom
-    ctx.fillRect(0, 0, T, H);          // left
-    ctx.fillRect(W - T, 0, T, H);      // right
+    ctx.fillRect(0, 0, W, T);              // top wall
+    ctx.fillRect(0, H - T, W, T);          // bottom wall
+    ctx.fillRect(0, T, T, H - 2 * T);      // left wall
+    ctx.fillRect(W - T, T, T, H - 2 * T);  // right wall
+
+    // Wall Bevel Shadow / Inner Shadow (Diablo-style 3D room edge depth)
+    ctx.fillStyle = 'rgba(2, 6, 23, 0.55)';
+    ctx.fillRect(T, T, W - 2 * T, 12);           // top inner shadow
+    ctx.fillRect(T, H - T - 12, W - 2 * T, 12);  // bottom inner shadow
+    ctx.fillRect(T, T, 12, H - 2 * T);           // left inner shadow
+    ctx.fillRect(W - T - 12, T, 12, H - 2 * T);  // right inner shadow
+
+    ctx.strokeStyle = 'rgba(0,0,0,0.45)'; ctx.lineWidth = 2.5;
+    ctx.strokeRect(T, T, W - 2 * T, H - 2 * T);
 
     // Stone horizontal mortar lines on top/bottom walls
     ctx.strokeStyle = 'rgba(0,0,0,0.28)'; ctx.lineWidth = 1.5;
