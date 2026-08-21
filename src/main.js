@@ -1110,10 +1110,17 @@ const App = (() => {
     let nextX = playerX + dx;
     let nextY = playerY + dy;
     
-    if (nextX < 40) nextX = 40;
-    if (nextX > 3560) nextX = 3560;
-    if (nextY < 40) nextY = 40;
-    if (nextY > 1720) nextY = 1720;
+    if (inDungeon) {
+      if (nextX < 20) nextX = 20;
+      if (nextX > 940) nextX = 940;
+      if (nextY < 20) nextY = 20;
+      if (nextY > 500) nextY = 500;
+    } else {
+      if (nextX < 40) nextX = 40;
+      if (nextX > 3560) nextX = 3560;
+      if (nextY < 40) nextY = 40;
+      if (nextY > 1720) nextY = 1720;
+    }
 
     if (!checkObstacleCollision(nextX, playerY, 15)) {
       playerX = nextX;
@@ -1538,8 +1545,8 @@ const App = (() => {
           }
 
           // Spawn player at centre-bottom of start room (away from north doors)
-          playerX = 900;
-          playerY = 620;
+          playerX = 480;
+          playerY = 350;
           initDungeonMinions(dp.id); // start room — no enemies
           if (window.AudioEngine) window.AudioEngine.playSparkle();
         }
@@ -1659,11 +1666,12 @@ const App = (() => {
         // Door Transition Detection
         const T  = DE.WALL_T, DW = DE.DOOR_W;
         const RW = DE.ROOM_W, RH = DE.ROOM_H;
+        const OX = DE.OFFSET_X || 420, OY = DE.OFFSET_Y || 180;
         const TRANS = [
-          { dir:'north', hitFn: () => playerY < T + 22,  inRange: () => playerX > RW/2-DW/2 && playerX < RW/2+DW/2, spawnX: RW/2,    spawnY: RH-T-70 },
-          { dir:'south', hitFn: () => playerY > RH-T-22, inRange: () => playerX > RW/2-DW/2 && playerX < RW/2+DW/2, spawnX: RW/2,    spawnY: T+70    },
-          { dir:'west',  hitFn: () => playerX < T + 22,  inRange: () => playerY > RH/2-DW/2 && playerY < RH/2+DW/2, spawnX: RW-T-90, spawnY: RH/2    },
-          { dir:'east',  hitFn: () => playerX > RW-T-22, inRange: () => playerY > RH/2-DW/2 && playerY < RH/2+DW/2, spawnX: T+90,    spawnY: RH/2    }
+          { dir:'north', hitFn: () => playerY < T + 20,  inRange: () => playerX > RW/2-DW/2 && playerX < RW/2+DW/2, spawnX: RW/2,    spawnY: RH-T-60 },
+          { dir:'south', hitFn: () => playerY > RH-T-20, inRange: () => playerX > RW/2-DW/2 && playerX < RW/2+DW/2, spawnX: RW/2,    spawnY: T+60    },
+          { dir:'west',  hitFn: () => playerX < T + 20,  inRange: () => playerY > RH/2-DW/2 && playerY < RH/2+DW/2, spawnX: RW-T-70, spawnY: RH/2    },
+          { dir:'east',  hitFn: () => playerX > RW-T-20, inRange: () => playerY > RH/2-DW/2 && playerY < RH/2+DW/2, spawnX: T+70,    spawnY: RH/2    }
         ];
 
         for (const t of TRANS) {
@@ -1705,15 +1713,19 @@ const App = (() => {
           }
         }
 
-        // Render room
+        // Render centered 960x520 room
+        ctx.save();
+        ctx.translate(OX, OY);
         DE.renderRoom(ctx, dungeonRun, currentRoomIdx, playerX, playerY, roomLocked, dungeonBgImg, chestSprites);
+
+        ctx.restore();
 
         // Minimap
         DE.renderMinimap(ctx, dungeonRun, currentRoomIdx, canvas.width || 1800);
 
         // Exit Portal (start room only)
         if (currentRoomIdx === dungeonRun.startRoomIdx) {
-          const exitX = RW / 2, exitY = RH - 210;
+          const exitX = RW / 2, exitY = RH - 140;
           const exPulse = Math.sin(Date.now() / 150) * 4;
           const exGrad  = ctx.createRadialGradient(exitX, exitY, 5, exitX, exitY, 32 + exPulse);
           exGrad.addColorStop(0, '#ffffff');

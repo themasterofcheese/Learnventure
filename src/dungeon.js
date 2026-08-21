@@ -27,10 +27,12 @@ window.DungeonEngine = (() => {
   // ─── Layout Constants ────────────────────────────────────────
   const GRID_W   = 5;   // columns in grid
   const GRID_H   = 4;   // rows in grid
-  const ROOM_W   = 1800; // canvas width (matches existing dungeon space)
-  const ROOM_H   = 880;  // canvas height
-  const WALL_T   = 100;  // wall thickness px
-  const DOOR_W   = 200;  // door opening width px
+  const ROOM_W   = 960; // compact room width (half size for fast navigation)
+  const ROOM_H   = 520; // compact room height
+  const WALL_T   = 60;  // wall thickness px
+  const DOOR_W   = 140; // door opening width px
+  const OFFSET_X = (1800 - ROOM_W) / 2; // 420px viewport centering offset
+  const OFFSET_Y = (880 - ROOM_H) / 2;  // 180px viewport centering offset
 
   const DIRS = [
     { dx: 0, dy: -1, door: 'north', opp: 'south' },
@@ -611,7 +613,7 @@ window.DungeonEngine = (() => {
     };
 
     const tpls    = templates[subject] || templates.dungeon_math;
-    const positions = [[620, 280], [1180, 560], [900, 390], [500, 620]];
+    const positions = [[320, 180], [640, 340], [480, 260], [340, 340]];
     const enemies = [];
 
     for (let i = 0; i < count; i++) {
@@ -643,7 +645,7 @@ window.DungeonEngine = (() => {
       name:      '📜 Quiz Spirit',
       sprite:    `assets/minion_${subj}_wraith.jpg`,
       emoji:     '🔮',
-      x: 900, y: 380,
+      x: 480, y: 240,
       vx: 0, vy: 0,
       radius: 18, active: true,
       isSpecial: false, isQuizSpirit: true
@@ -658,6 +660,6 @@ window.DungeonEngine = (() => {
     spawnRoomEnemies,
     spawnQuizSpirit,
     SYNERGY_ITEMS,
-    ROOM_W, ROOM_H, WALL_T, DOOR_W
+    ROOM_W, ROOM_H, WALL_T, DOOR_W, OFFSET_X, OFFSET_Y
   };
 })();
