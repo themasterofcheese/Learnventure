@@ -1644,7 +1644,18 @@ const App = (() => {
       // ──────────────────────────────────────────────────────
       // ISAAC-STYLE ROOM NETWORK DUNGEON
       // ──────────────────────────────────────────────────────
-      if (dungeonRun && window.DungeonEngine) {
+      if (inDungeon && (!dungeonRun || !dungeonRun.rooms) && activeDungeonId && window.DungeonEngine) {
+        const dayOffset = ['dungeon_math','dungeon_chem','dungeon_bio','dungeon_phys'].indexOf(activeDungeonId);
+        const daySeed   = (Math.floor(Date.now() / 86400000) * 1000) + (dayOffset >= 0 ? dayOffset : 0) + 7;
+        dungeonRun     = window.DungeonEngine.generateDungeonRun(activeDungeonId, daySeed);
+        currentRoomIdx = dungeonRun.startRoomIdx;
+        roomLocked     = false;
+        if (dungeonRun.rooms && dungeonRun.rooms[currentRoomIdx]) {
+          dungeonRun.rooms[currentRoomIdx].visited = true;
+        }
+      }
+
+      if (dungeonRun && dungeonRun.rooms && window.DungeonEngine) {
         const DE  = window.DungeonEngine;
         const curRoom = dungeonRun.rooms[currentRoomIdx];
 
@@ -1750,11 +1761,12 @@ const App = (() => {
             activeDungeonId = null;
             initAdventureMinions();
             if (window.AudioEngine) window.AudioEngine.playSparkle();
+            return;
           }
         }
 
         // Chest rendering for current room
-        const roomForChest = dungeonRun.rooms[currentRoomIdx];
+        const roomForChest = (dungeonRun && dungeonRun.rooms) ? dungeonRun.rooms[currentRoomIdx] : null;
         if (roomForChest && roomForChest.chest) {
           const chest = roomForChest.chest;
           const cDist = Math.hypot(playerX - chest.x, playerY - chest.y);
