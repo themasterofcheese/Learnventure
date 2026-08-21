@@ -17,27 +17,27 @@ window.TileRenderer = (() => {
   // HD Generated Tile Image Textures
   const hdImages = {};
   const hdSources = {
-    // MATH REALM (Top-Left: Crystal Meadow & Sapphire Quartz)
-    grass: 'assets/tile_grass.jpg',
-    crystal_dense: 'assets/tile_crystal.jpg',
-    crystal_rock: 'assets/tile_crystal.jpg',
+    // MATH REALM (Top-Left: Sapphire Slate & Cyan Quartz)
+    grass: 'assets/dungeon_math_floor.jpg',
+    crystal_dense: 'assets/dungeon_math_floor.jpg',
+    crystal_rock: 'assets/dungeon_math_floor.jpg',
 
-    // CHEMISTRY REALM (Top-Right: 100% Molten Magma Lava & Volcanic Basalt)
-    acid_ground: 'assets/tile_lava.jpg',
-    acid_pool: 'assets/tile_lava.jpg',
-    lava: 'assets/tile_lava.jpg',
-    volcanic: 'assets/tile_lava.jpg',
+    // CHEMISTRY REALM (Top-Right: Volcanic Basalt & Molten Magma)
+    acid_ground: 'assets/dungeon_chem_floor.jpg',
+    acid_pool: 'assets/dungeon_chem_floor.jpg',
+    lava: 'assets/dungeon_chem_floor.jpg',
+    volcanic: 'assets/dungeon_chem_floor.jpg',
 
-    // BIOLOGY REALM (Bottom-Left: 100% Bioluminescent Jungle & Swamp)
-    jungle: 'assets/tile_jungle.jpg',
-    swamp: 'assets/tile_jungle.jpg',
-    swamp_water: 'assets/tile_jungle.jpg',
+    // BIOLOGY REALM (Bottom-Left: Bioluminescent Emerald Moss)
+    jungle: 'assets/dungeon_bio_floor.jpg',
+    swamp: 'assets/dungeon_bio_floor.jpg',
+    swamp_water: 'assets/dungeon_bio_floor.jpg',
 
-    // PHYSICS REALM (Bottom-Right: 100% Metallic Steel Circuits & Tesla Arcs)
-    crater: 'assets/tile_physics.jpg',
-    lab_floor: 'assets/tile_physics.jpg',
-    wall: 'assets/tile_physics.jpg',
-    chasm: 'assets/tile_physics.jpg',
+    // PHYSICS REALM (Bottom-Right: Quantum Steel & Cyber Circuits)
+    crater: 'assets/dungeon_phys_floor.jpg',
+    lab_floor: 'assets/dungeon_phys_floor.jpg',
+    wall: 'assets/dungeon_phys_floor.jpg',
+    chasm: 'assets/dungeon_phys_floor.jpg',
 
     // SHARED TOWN PLAZA
     plaza: 'assets/tile_plaza.jpg',
@@ -107,13 +107,10 @@ window.TileRenderer = (() => {
 
     ctx.save();
 
-    // 1. Render HD Generated Image Texture (sub-crop sampling for zero repetitive grid effect)
+    // 1. Render Seamless HD Image Texture
     const img = hdImages[tileType];
     if (img && img.complete && img.naturalWidth > 0) {
-      const cropSize = 128;
-      const srcX = (wTx * 97) % (img.naturalWidth - cropSize);
-      const srcY = (wTy * 113) % (img.naturalHeight - cropSize);
-      ctx.drawImage(img, srcX, srcY, cropSize, cropSize, px, py, S, S);
+      ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight, px, py, S, S);
     } else {
       // Fallback
       const fallback = proceduralAtlas[tileType] || proceduralAtlas['grass'];
