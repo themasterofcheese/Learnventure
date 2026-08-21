@@ -1,16 +1,20 @@
 {
   "tiles": [
-    { "id": "hex_math_slate",    "realm": "math", "name": "Sapphire Slate Hex",     "path": "assets/hex/hex_math_slate.jpg" },
-    { "id": "hex_math_crystal",  "realm": "math", "name": "Cyan Quartz Hex",        "path": "assets/hex/hex_math_crystal.jpg" },
-    { "id": "hex_math_cobble",   "realm": "math", "name": "Indigo Cobblestone Hex",  "path": "assets/hex/hex_math_cobble.jpg" },
-    { "id": "hex_chem_basalt",   "realm": "chem", "name": "Volcanic Basalt Hex",    "path": "assets/hex/hex_chem_basalt.jpg" },
-    { "id": "hex_chem_ember",    "realm": "chem", "name": "Ember Charcoal Hex",     "path": "assets/hex/hex_chem_ember.jpg" },
-    { "id": "hex_chem_olive",    "realm": "chem", "name": "Olive Chemical Hex",     "path": "assets/hex/hex_chem_olive.jpg" },
-    { "id": "hex_bio_moss",      "realm": "bio",  "name": "Forest Moss Hex",        "path": "assets/hex/hex_bio_moss.jpg" },
-    { "id": "hex_bio_spore",     "realm": "bio",  "name": "Emerald Spore Hex",      "path": "assets/hex/hex_bio_spore.jpg" },
-    { "id": "hex_bio_timber",    "realm": "bio",  "name": "Petrified Timber Hex",   "path": "assets/hex/hex_bio_timber.jpg" },
-    { "id": "hex_phys_steel",    "realm": "phys", "name": "Steel Alloy Hex",        "path": "assets/hex/hex_phys_steel.jpg" },
-    { "id": "hex_phys_circuit",  "realm": "phys", "name": "Violet Circuit Hex",     "path": "assets/hex/hex_phys_circuit.jpg" },
-    { "id": "hex_phys_obsidian", "realm": "phys", "name": "Obsidian Metallic Hex",  "path": "assets/hex/hex_phys_obsidian.jpg" }
+    { "id": "hex_math_slate",    "realm": "math",  "name": "Sapphire Slate Hex",     "path": "assets/hex/hex_math_slate.jpg" },
+    { "id": "hex_math_crystal",  "realm": "math",  "name": "Cyan Quartz Hex",        "path": "assets/hex/hex_math_crystal.jpg" },
+    { "id": "hex_math_cobble",   "realm": "math",  "name": "Indigo Cobblestone Hex",  "path": "assets/hex/hex_math_cobble.jpg" },
+    { "id": "hex_chem_basalt",   "realm": "chem",  "name": "Volcanic Basalt Hex",    "path": "assets/hex/hex_chem_basalt.jpg" },
+    { "id": "hex_chem_ember",    "realm": "chem",  "name": "Ember Charcoal Hex",     "path": "assets/hex/hex_chem_ember.jpg" },
+    { "id": "hex_chem_olive",    "realm": "chem",  "name": "Olive Chemical Hex",     "path": "assets/hex/hex_chem_olive.jpg" },
+    { "id": "hex_bio_moss",      "realm": "bio",   "name": "Forest Moss Hex",        "path": "assets/hex/hex_bio_moss.jpg" },
+    { "id": "hex_bio_spore",     "realm": "bio",   "name": "Emerald Spore Hex",      "path": "assets/hex/hex_bio_spore.jpg" },
+    { "id": "hex_bio_timber",    "realm": "bio",   "name": "Petrified Timber Hex",   "path": "assets/hex/hex_bio_timber.jpg" },
+    { "id": "hex_phys_steel",    "realm": "phys",  "name": "Steel Alloy Hex",        "path": "assets/hex/hex_phys_steel.jpg" },
+    { "id": "hex_phys_circuit",  "realm": "phys",  "name": "Violet Circuit Hex",     "path": "assets/hex/hex_phys_circuit.jpg" },
+    { "id": "hex_phys_obsidian", "realm": "phys",  "name": "Obsidian Metallic Hex",  "path": "assets/hex/hex_phys_obsidian.jpg" },
+    { "id": "hex_shop_plaza",    "realm": "shop",  "name": "Golden Limestone Hex",   "path": "assets/hex/hex_shop_plaza.jpg" },
+    { "id": "hex_shop_timber",   "realm": "shop",  "name": "Polished Oak Wood Hex",  "path": "assets/hex/hex_shop_timber.jpg" },
+    { "id": "hex_shop_brick",    "realm": "shop",  "name": "Terracotta Sand Brick",  "path": "assets/hex/hex_shop_brick.jpg" },
+    { "id": "hex_shop_marble",   "realm": "shop",  "name": "Cream Gold Marble Hex",  "path": "assets/hex/hex_shop_marble.jpg" }
   ]
 }
