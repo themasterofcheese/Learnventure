@@ -1111,10 +1111,20 @@ const App = (() => {
     let nextY = playerY + dy;
     
     if (inDungeon) {
-      if (nextX < 20) nextX = 20;
-      if (nextX > 940) nextX = 940;
-      if (nextY < 20) nextY = 20;
-      if (nextY > 500) nextY = 500;
+      const T = (window.DungeonEngine && window.DungeonEngine.WALL_T) || 60;
+      const RW = (window.DungeonEngine && window.DungeonEngine.ROOM_W) || 960;
+      const RH = (window.DungeonEngine && window.DungeonEngine.ROOM_H) || 520;
+      const DW = (window.DungeonEngine && window.DungeonEngine.DOOR_W) || 140;
+      
+      const inDoorN = (nextY < T) && (nextX > RW/2 - DW/2 + 10) && (nextX < RW/2 + DW/2 - 10);
+      const inDoorS = (nextY > RH - T) && (nextX > RW/2 - DW/2 + 10) && (nextX < RW/2 + DW/2 - 10);
+      const inDoorW = (nextX < T) && (nextY > RH/2 - DW/2 + 10) && (nextY < RH/2 + DW/2 - 10);
+      const inDoorE = (nextX > RW - T) && (nextY > RH/2 - DW/2 + 10) && (nextY < RH/2 + DW/2 - 10);
+
+      if (!inDoorW && nextX < T + 10) nextX = T + 10;
+      if (!inDoorE && nextX > RW - T - 10) nextX = RW - T - 10;
+      if (!inDoorN && nextY < T + 10) nextY = T + 10;
+      if (!inDoorS && nextY > RH - T - 10) nextY = RH - T - 10;
     } else {
       if (nextX < 40) nextX = 40;
       if (nextX > 3560) nextX = 3560;
@@ -1325,7 +1335,13 @@ const App = (() => {
 
     let camX = 0;
     let camY = 0;
-    if (!inMarket) {
+    let curZoom = zoom;
+
+    if (inMarket || inDungeon) {
+      camX = 0;
+      camY = 0;
+      curZoom = 1.0;
+    } else {
       camX = Math.max(0, Math.min(WORLD_WIDTH - visibleWorldW, playerX - visibleWorldW / 2));
       camY = Math.max(0, Math.min(WORLD_HEIGHT - visibleWorldH, playerY - visibleWorldH / 2));
     }
@@ -1334,7 +1350,7 @@ const App = (() => {
     ctx.fillRect(0, 0, viewW, viewH);
     
     ctx.save();
-    ctx.scale(zoom, zoom);
+    ctx.scale(curZoom, curZoom);
     ctx.translate(-camX, -camY);
 
     if (inMarket) {
@@ -1724,12 +1740,10 @@ const App = (() => {
           }
         }
 
-        // Render centered 960x520 room
+        // Render centered 960x520 room inside translation context
         ctx.save();
         ctx.translate(OX, OY);
         DE.renderRoom(ctx, dungeonRun, currentRoomIdx, playerX, playerY, roomLocked, dungeonBgImg, chestSprites);
-
-        ctx.restore();
 
         // Minimap
         DE.renderMinimap(ctx, dungeonRun, currentRoomIdx, canvas.width || 1800);
